@@ -33,6 +33,8 @@ def generate_launch_description():
     set_plugin_path = AppendEnvironmentVariable('IGN_GAZEBO_SYSTEM_PLUGIN_PATH', os.path.join(get_package_share_directory('gazebo_plugins'), '../../lib/gazebo_plugins'))
 
 # Puente Gazebo ========================================
+    sdf_file_path = os.path.join(pkg_share_dron_vizualization, 'urdf', 'dron2.sdf')
+
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(
             get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py')]),
@@ -44,7 +46,8 @@ def generate_launch_description():
         executable='create',
         arguments=[
             '-name', 'dron',
-            '-topic', 'robot_description'
+            '-file', sdf_file_path,
+            '-z', '0.25'
         ],
         output='screen'
     )
@@ -52,10 +55,11 @@ def generate_launch_description():
     bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
-        additional_env={'IGN_PARTITION': 'dron_sim'},
+        # additional_env={'IGN_PARTITION': 'dron_sim'},
         arguments=[
             '/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock',
             '/camera@sensor_msgs/msg/Image[ignition.msgs.Image',
+            '/dron/cmd_vel@geometry_msgs/msg/Twist]ignition.msgs.Twist'
         ],
         output='screen'
     )
@@ -76,6 +80,14 @@ def generate_launch_description():
         }]
     )
 
+# Nodos =====================================================
+    prueba = Node(
+        package='control',
+        executable='prueba',
+        name='prueba',
+        parameters=[{'use_sim_time': True}]
+    )
+
     return LaunchDescription([
         set_qt_platform,
         set_partition,
@@ -89,5 +101,7 @@ def generate_launch_description():
         gazebo,
         spawn_robot,
         bridge,
-        dron_state_publisher,
+        dron_state_publisher
+
+        # prueba
     ])

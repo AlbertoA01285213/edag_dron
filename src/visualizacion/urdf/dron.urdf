@@ -1,22 +1,18 @@
 <?xml version="1.0"?>
 <robot name="dron">
     <gazebo>
-        <static>true</static>
+        <static>false</static>
     </gazebo>
+<!-- 
     <link name="world_link"/>
 
-    <joint name="world_fixed" type="fixed">
+    <joint name="world_to_base" type="fixed">
         <parent link="world_link"/>
         <child link="base_link"/>
-        <origin xyz="0 0 0.22" rpy="0 0 0"/>
-    </joint>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint> -->
 
-    <link name="base_link">
-        <inertial>
-            <mass value="5.0"/>
-            <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0" />
-        </inertial>
-    </link>
+    <link name="base_link"/>
 
     <link name="dron_link">
         <visual>
@@ -35,9 +31,15 @@
         </inertial>
     </link>
 
+    <joint name="base_to_dron" type="fixed">
+        <parent link="base_link"/>
+        <child link="dron_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
     <link name="propela_1">
         <visual>
-            <origin rpy="0 0 0" xyz="0 0 0"/>
+            <origin rpy="0 0 0" xyz="-0.155 0.068 -0.003"/>
             <geometry>
                 <mesh filename="package://visualizacion/models/propela/meshes/propela.obj" scale=" 2 2 2"/>
             </geometry>
@@ -48,13 +50,13 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="0.1"/> <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+            <mass value="0.01"/> <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
         </inertial>
     </link>
 
     <link name="propela_2">
         <visual>
-            <origin rpy="0 0 0" xyz="0 0 0"/>
+            <origin rpy="0 0 0" xyz="-0.155 0.068 -0.003"/>
             <geometry>
                 <mesh filename="package://visualizacion/models/propela/meshes/propela.obj" scale=" 2 2 2"/>
             </geometry>
@@ -65,13 +67,13 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="0.1"/> <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+            <mass value="0.01"/> <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
         </inertial>
     </link>
 
     <link name="propela_3">
         <visual>
-            <origin rpy="0 0 0" xyz="0 0 0"/>
+            <origin rpy="0 0 0" xyz="-0.155 0.114 -0.04"/>
             <geometry>
                 <mesh filename="package://visualizacion/models/propela/meshes/propela.obj" scale=" 2 2 2"/>
             </geometry>
@@ -82,13 +84,13 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="0.1"/> <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+            <mass value="0.01"/> <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
         </inertial>
     </link>
 
     <link name="propela_4">
         <visual>
-            <origin rpy="0 0 0" xyz="0 0 0"/>
+            <origin rpy="0 0 0" xyz="-0.155 0.114 -0.04"/>
             <geometry>
                 <mesh filename="package://visualizacion/models/propela/meshes/propela.obj" scale=" 2 2 2"/>
             </geometry>
@@ -99,7 +101,7 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="0.1"/> <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+            <mass value="0.01"/> <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
         </inertial>
     </link>
 
@@ -119,12 +121,6 @@
         </inertial>
     </link>
 
-    <joint name="base_to_dron" type="fixed">
-        <parent link="base_link"/>
-        <child link="dron_link"/>
-        <origin xyz="0 0 0" rpy="0 0 0"/>
-    </joint>
-
     <joint name="dron_to_camera" type="fixed">
         <parent link="dron_link"/>
         <child link="camera_link"/>
@@ -134,35 +130,30 @@
     <joint name="dron_to_propela1" type="continuous">
         <parent link="dron_link"/>
         <child link="propela_1"/>
-        <origin xyz="0 -0.067 -0.003" rpy="0 0 0"/> 
+        <origin xyz="0.155 -0.135 0" rpy="0 0 0"/> 
         <axis xyz="0 0 1"/>
     </joint>
 
     <joint name="dron_to_propela2" type="continuous">
         <parent link="dron_link"/>
         <child link="propela_2"/>
-        <origin xyz="-0.31 -0.067 -0.003" rpy="0 0 0"/> 
+        <origin xyz="-0.155 0.135 0" rpy="0 0 0"/> 
         <axis xyz="0 0 1"/>
     </joint>
 
     <joint name="dron_to_propela3" type="continuous">
         <parent link="dron_link"/>
         <child link="propela_3"/>
-        <origin xyz="0 0.248 -0.04" rpy="0 0 0"/> 
+        <origin xyz="0.155 0.135 0" rpy="0 0 0"/> 
         <axis xyz="0 0 1"/>
     </joint>
 
     <joint name="dron_to_propela4" type="continuous">
         <parent link="dron_link"/>
         <child link="propela_4"/>
-        <origin xyz="-0.31 0.248 -0.04" rpy="0 0 0"/> 
+        <origin xyz="-0.155 -0.135 0" rpy="0 0 0"/> 
         <axis xyz="0 0 1"/>
     </joint>
-
-    <gazebo reference="base_link">
-        <kinematic>true</kinematic>
-        <gravity>0</gravity>
-    </gazebo>
 
     <gazebo reference="camera_link">
         <sensor name="camera" type="camera">
@@ -194,6 +185,45 @@
             <publish_model_pose>true</publish_model_pose> <publish_nested_model_pose>false</publish_nested_model_pose>
             <use_pose_vector_msg>false</use_pose_vector_msg>
             <update_frequency>50</update_frequency> 
+        </plugin>
+        <plugin
+            filename="ignition-gazebo-multicopter-control-system"
+            name="ignition::gazebo::systems::MulticopterVelocityControl">
+            <robotNamespace>dron</robotNamespace>
+            <commandSubTopic>cmd_vel</commandSubTopic>
+            <enableControl>true</enableControl>
+            <comLinkName>base_link</comLinkName>
+
+            <velocityGain>2.0 2.0 2.0</velocityGain>
+            <attitudeGain>2.0 2.0 2.0</attitudeGain>
+            <angularRateGain>0.5 0.5 0.5</angularRateGain>
+    
+            <rotorConfiguration>
+                <rotor>
+                    <jointName>dron_to_propela1</jointName>
+                    <forceConstant>8.54858e-06</forceConstant>
+                    <momentConstant>0.016</momentConstant>
+                    <direction>1</direction> 
+                </rotor>
+                <rotor>
+                    <jointName>dron_to_propela2</jointName>
+                    <forceConstant>8.54858e-06</forceConstant>
+                    <momentConstant>0.016</momentConstant>
+                    <direction>1</direction>
+                </rotor>
+                <rotor>
+                    <jointName>dron_to_propela3</jointName>
+                    <forceConstant>8.54858e-06</forceConstant>
+                    <momentConstant>0.016</momentConstant>
+                    <direction>-1</direction>
+                </rotor>
+                <rotor>
+                    <jointName>dron_to_propela4</jointName>
+                    <forceConstant>8.54858e-06</forceConstant>
+                    <momentConstant>0.016</momentConstant>
+                    <direction>-1</direction>
+                </rotor>
+            </rotorConfiguration>
         </plugin>
     </gazebo>
 </robot>
