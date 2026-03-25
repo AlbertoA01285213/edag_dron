@@ -8,7 +8,7 @@
     <joint name="world_fixed" type="fixed">
         <parent link="world_link"/>
         <child link="base_link"/>
-        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <origin xyz="0 0 0.22" rpy="0 0 0"/>
     </joint>
 
     <link name="base_link">
@@ -22,11 +22,76 @@
         <visual>
             <origin rpy="0 0 0" xyz="0 0 0"/>
             <geometry>
-                <mesh filename="package://visualizacion/meshes/dron.stl" scale=" 0.01 0.01 0.01"/>
+                <mesh filename="package://visualizacion/models/dron/meshes/djimini4pro.obj" scale=" 2 2 2"/>
             </geometry>
-            <material name="Cyan">
-                <color rgba="0 1.0 1.0 1.0"/>
-            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.1 0.1 0.1"/>
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.1"/> <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+        </inertial>
+    </link>
+
+    <link name="propela_1">
+        <visual>
+            <origin rpy="0 0 0" xyz="0 0 0"/>
+            <geometry>
+                <mesh filename="package://visualizacion/models/propela/meshes/propela.obj" scale=" 2 2 2"/>
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.1 0.1 0.1"/>
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.1"/> <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+        </inertial>
+    </link>
+
+    <link name="propela_2">
+        <visual>
+            <origin rpy="0 0 0" xyz="0 0 0"/>
+            <geometry>
+                <mesh filename="package://visualizacion/models/propela/meshes/propela.obj" scale=" 2 2 2"/>
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.1 0.1 0.1"/>
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.1"/> <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+        </inertial>
+    </link>
+
+    <link name="propela_3">
+        <visual>
+            <origin rpy="0 0 0" xyz="0 0 0"/>
+            <geometry>
+                <mesh filename="package://visualizacion/models/propela/meshes/propela.obj" scale=" 2 2 2"/>
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.1 0.1 0.1"/>
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.1"/> <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+        </inertial>
+    </link>
+
+    <link name="propela_4">
+        <visual>
+            <origin rpy="0 0 0" xyz="0 0 0"/>
+            <geometry>
+                <mesh filename="package://visualizacion/models/propela/meshes/propela.obj" scale=" 2 2 2"/>
+            </geometry>
         </visual>
         <collision>
             <geometry>
@@ -64,6 +129,34 @@
         <parent link="dron_link"/>
         <child link="camera_link"/>
         <origin xyz="1.0 0 0.5" rpy="0 0 0"/> 
+    </joint>
+
+    <joint name="dron_to_propela1" type="continuous">
+        <parent link="dron_link"/>
+        <child link="propela_1"/>
+        <origin xyz="0 -0.067 -0.003" rpy="0 0 0"/> 
+        <axis xyz="0 0 1"/>
+    </joint>
+
+    <joint name="dron_to_propela2" type="continuous">
+        <parent link="dron_link"/>
+        <child link="propela_2"/>
+        <origin xyz="-0.31 -0.067 -0.003" rpy="0 0 0"/> 
+        <axis xyz="0 0 1"/>
+    </joint>
+
+    <joint name="dron_to_propela3" type="continuous">
+        <parent link="dron_link"/>
+        <child link="propela_3"/>
+        <origin xyz="0 0.248 -0.04" rpy="0 0 0"/> 
+        <axis xyz="0 0 1"/>
+    </joint>
+
+    <joint name="dron_to_propela4" type="continuous">
+        <parent link="dron_link"/>
+        <child link="propela_4"/>
+        <origin xyz="-0.31 0.248 -0.04" rpy="0 0 0"/> 
+        <axis xyz="0 0 1"/>
     </joint>
 
     <gazebo reference="base_link">
