@@ -5,7 +5,7 @@
         <link name="dron/body">
             <inertial>
                 <pose>0 0.01 0 0 0 0</pose>
-                <mass>0.25</mass>
+                <mass>0.025</mass>
                 <inertia>
                     <ixx>0.000016572</ixx>
                     <ixy>0.00</ixy>
@@ -35,10 +35,10 @@
         </link>
 
         <link name="dron/m1_prop">
-            <pose> 0.15 -0.15 0 0 0 0</pose>
+            <pose> 0.031 -0.15 0.021 0 0 0</pose>
             <inertial>
                 <pose>0 0 0 0 0 0</pose>
-                <mass>0.001</mass>
+                <mass>0.0008</mass>
                 <inertia>
                     <ixx>0.00000014</ixx>
                     <iyy>0.00001169</iyy>
@@ -49,7 +49,7 @@
                 </inertia>
             </inertial>
             <visual name="dron/m1_visual">
-                <pose>-0.147 -0.067 -0.002 0 0 0</pose>
+                <pose>-0.266 0.052 -0.002 0 0 0</pose>
                 <geometry>
                     <mesh>
                         <uri>model://propela/meshes/propela.obj</uri>
@@ -60,14 +60,14 @@
         </link>
 
         <link name="dron/m2_prop">
-            <pose> -0.15 -0.15 0 0 0 0</pose>
+            <pose> -0.031 -0.031 0.021 0 0 0</pose>
             <inertial>
                 <pose>0 0 0 0 0 0</pose>
-                <mass>0.001</mass>
+                <mass>0.0008</mass>
                 <inertia>
-                    <ixx>0.00000014</ixx>
-                    <iyy>0.00001169</iyy>
-                    <izz>0.00001176</izz>
+                    <ixx>0.0000001</ixx>
+                    <iyy>0.00000835</iyy>
+                    <izz>0.0000084</izz>
                     <ixy>0</ixy>
                     <ixz>0</ixz>
                     <iyz>0</iyz>
@@ -85,14 +85,14 @@
         </link>
 
         <link name="dron/m3_prop">
-            <pose> -0.15 0.15 0 0 0 0</pose>
+            <pose> -0.031 0.031 0.021 0 0 0</pose>
             <inertial>
                 <pose>0 0 0 0 0 0</pose>
-                <mass>0.001</mass>
+                <mass>0.0008</mass>
                 <inertia>
-                    <ixx>0.00000014</ixx>
-                    <iyy>0.00001169</iyy>
-                    <izz>0.00001176</izz>
+                    <ixx>0.0000001</ixx>
+                    <iyy>0.00000835</iyy>
+                    <izz>0.0000084</izz>
                     <ixy>0</ixy>
                     <ixz>0</ixz>
                     <iyz>0</iyz>
@@ -110,14 +110,14 @@
         </link>
 
         <link name="dron/m4_prop">
-            <pose> 0.15 0.15 0 0 0 0</pose>
+            <pose> 0.031 0.031 0.021 0 0 0</pose>
             <inertial>
                 <pose>0 0 0 0 0 0</pose>
-                <mass>0.001</mass>
+                <mass>0.0008</mass>
                 <inertia>
-                    <ixx>0.00000014</ixx>
-                    <iyy>0.00001169</iyy>
-                    <izz>0.00001176</izz>
+                    <ixx>0.0000001</ixx>
+                    <iyy>0.00000835</iyy>
+                    <izz>0.0000084</izz>
                     <ixy>0</ixy>
                     <ixz>0</ixz>
                     <iyz>0</iyz>
@@ -211,15 +211,15 @@
         <turningDirection>ccw</turningDirection>
         <timeConstantUp>0.0125</timeConstantUp>
         <timeConstantDown>0.025</timeConstantDown>
-        <maxRotVelocity>1000</maxRotVelocity>
-        <motorConstant>8.5e-08</motorConstant>
+        <maxRotVelocity>2618</maxRotVelocity>
+        <motorConstant>4e-05</motorConstant>
         <momentConstant>2.4e-04</momentConstant>
-        <commandSubTopic>actuators</commandSubTopic>
+        <commandSubTopic>gazebo/command/motor_speed</commandSubTopic>
         <motorNumber>0</motorNumber>
         <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
         <rollingMomentCoefficient>0.0000001</rollingMomentCoefficient>
         <motorSpeedPubTopic>motor_speed/0</motorSpeedPubTopic>
-        <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+        <rotorVelocitySlowdownSim>1</rotorVelocitySlowdownSim>
         <motorType>velocity</motorType>
     </plugin>
     <plugin
@@ -231,15 +231,15 @@
         <turningDirection>cw</turningDirection>
         <timeConstantUp>0.0125</timeConstantUp>
         <timeConstantDown>0.025</timeConstantDown>
-        <maxRotVelocity>1000</maxRotVelocity>
-        <motorConstant>8.5e-08</motorConstant>
+        <maxRotVelocity>2618</maxRotVelocity>
+        <motorConstant>4e-05</motorConstant>
         <momentConstant>2.4e-04</momentConstant>
-        <commandSubTopic>actuators</commandSubTopic>
+        <commandSubTopic>gazebo/command/motor_speed</commandSubTopic>
         <motorNumber>1</motorNumber>
         <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
         <rollingMomentCoefficient>0.0000001</rollingMomentCoefficient>
         <motorSpeedPubTopic>motor_speed/1</motorSpeedPubTopic>
-        <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+        <rotorVelocitySlowdownSim>1</rotorVelocitySlowdownSim>
         <motorType>velocity</motorType>
     </plugin>
     <plugin
@@ -251,15 +251,15 @@
         <turningDirection>ccw</turningDirection>
         <timeConstantUp>0.0125</timeConstantUp>
         <timeConstantDown>0.025</timeConstantDown>
-        <maxRotVelocity>1000</maxRotVelocity>
-        <motorConstant>8.5e-08</motorConstant>
+        <maxRotVelocity>2618</maxRotVelocity>
+        <motorConstant>4e-05</motorConstant>
         <momentConstant>2.4e-04</momentConstant>
-        <commandSubTopic>actuators</commandSubTopic>
+        <commandSubTopic>gazebo/command/motor_speed</commandSubTopic>
         <motorNumber>2</motorNumber>
         <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
         <rollingMomentCoefficient>0.0000001</rollingMomentCoefficient>
         <motorSpeedPubTopic>motor_speed/2</motorSpeedPubTopic>
-        <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+        <rotorVelocitySlowdownSim>1</rotorVelocitySlowdownSim>
         <motorType>velocity</motorType>
     </plugin>
     <plugin
@@ -271,15 +271,15 @@
         <turningDirection>cw</turningDirection>
         <timeConstantUp>0.0125</timeConstantUp>
         <timeConstantDown>0.025</timeConstantDown>
-        <maxRotVelocity>1000</maxRotVelocity>
-        <motorConstant>8.5e-08</motorConstant>
+        <maxRotVelocity>2618</maxRotVelocity>
+        <motorConstant>4e-05</motorConstant>
         <momentConstant>2.4e-04</momentConstant>
-        <commandSubTopic>actuators</commandSubTopic>
+        <commandSubTopic>gazebo/command/motor_speed</commandSubTopic>
         <motorNumber>3</motorNumber>
         <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
         <rollingMomentCoefficient>0.000001</rollingMomentCoefficient>
         <motorSpeedPubTopic>motor_speed/3</motorSpeedPubTopic>
-        <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+        <rotorVelocitySlowdownSim>1</rotorVelocitySlowdownSim>
         <motorType>velocity</motorType>
     </plugin> 
     <plugin
@@ -297,13 +297,44 @@
             linear: {x: 0.05}, angular: {z: 0.0}
             </output>
         </plugin>
-    <plugin
-        filename="ignition-gazebo-actuator-scaler-system"
-        name="ignition::gazebo::systems::ActuatorScaler">
-        <renderer>ogre2</renderer>
-        <sub_topic>actuators</sub_topic>
-        </plugin>
 
+    <plugin
+        filename="ignition-gazebo-multicopter-control-system"
+        name="ignition::gazebo::systems::MulticopterVelocityControl">
+        <robotNamespace>dron</robotNamespace>
+        <commandSubTopic>cmd_vel</commandSubTopic>
+        <enableControl>true</enableControl>
+        <comLinkName>dron/body</comLinkName>
+        <velocityGain>0.4 0.4 0.4</velocityGain> 
+        <attitudeGain>35.0 35.0 35.0</attitudeGain>
+        <angularRateGain>0.5 0.5 0.5</angularRateGain>
+        <rotorConfiguration>
+            <rotor>
+            <jointName>dron/m1_joint</jointName>
+            <forceConstant>8.5e-08</forceConstant>
+            <momentConstant>2.4e-04</momentConstant>
+            <direction>1</direction>
+            </rotor>
+            <rotor>
+            <jointName>dron/m2_joint</jointName>
+            <forceConstant>8.5e-08</forceConstant>
+            <momentConstant>2.4e-04</momentConstant>
+            <direction>-1</direction>
+            </rotor>
+            <rotor>
+            <jointName>dron/m3_joint</jointName>
+            <forceConstant>8.5e-08</forceConstant>
+            <momentConstant>2.4e-04</momentConstant>
+            <direction>1</direction>
+            </rotor>
+            <rotor>
+            <jointName>dron/m4_joint</jointName>
+            <forceConstant>8.5e-08</forceConstant>
+            <momentConstant>2.4e-04</momentConstant>
+            <direction>-1</direction>
+            </rotor>
+        </rotorConfiguration>
+        </plugin>
     </model>
 </sdf>
     
