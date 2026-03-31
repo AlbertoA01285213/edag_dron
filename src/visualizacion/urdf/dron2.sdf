@@ -2,7 +2,7 @@
 <sdf version="1.8">
     <model name="dron">
         <pose>0 0 0 0 0 0</pose>
-        <link name="dron/body">
+        <link name="base_link">
             <inertial>
                 <pose>0 0.01 0 0 0 0</pose>
                 <mass>0.25</mass>
@@ -15,7 +15,7 @@
                     <izz>0.000029262</izz>
                 </inertia>
             </inertial>
-            <collision name="dron/body_collision">
+            <collision name="base_link_collision">
                 <pose>0 0 0 0 0 0</pose>
                 <geometry>
                     <box>
@@ -23,7 +23,7 @@
                     </box>
                 </geometry>
             </collision>
-            <visual name="dron/body_visual">
+            <visual name="base_link_visual">
                 <pose>0 -0.15 0 0 0 0</pose>
                 <geometry>
                     <mesh>
@@ -32,6 +32,31 @@
                     </mesh>
                 </geometry>
             </visual>
+            <sensor name="imu_sensor" type="imu">
+                <always_on>1</always_on>
+                <update_rate>250</update_rate>
+                <!-- <visualize>true</visualize> -->
+                <!-- <topic>/imu</topic> -->
+                <!-- <topic>/world/mundo/model/dron/link/base_link/sensor/imu_sensor/imu</topic> -->
+            </sensor>
+            <sensor name="magnetometer_sensor" type="magnetometer">
+                <always_on>1</always_on>
+                <update_rate>100</update_rate>
+                <!-- <visualize>true</visualize>
+                <topic>/mag</topic> -->
+            </sensor>   
+            <sensor name="air_pressure_sensor" type="air_pressure">
+                <always_on>1</always_on>
+                <update_rate>50</update_rate>
+                <!-- <visualize>true</visualize>
+                <topic>/air_pressure</topic> -->
+            </sensor>
+            <sensor name="navsat_sensor" type="navsat">
+                <always_on>1</always_on>
+                <update_rate>10</update_rate>
+                <!-- <visualize>true</visualize> -->
+                <!-- <topic>/gps</topic> -->
+            </sensor>
         </link>
 
         <link name="dron/m1_prop">
@@ -136,7 +161,7 @@
 
         <joint name="dron/m1_joint" type="revolute">
             <child>dron/m1_prop</child>
-            <parent>dron/body</parent>
+            <parent>base_link</parent>
             <axis>
                 <xyz>0 0 1</xyz>
                 <limit>
@@ -153,7 +178,7 @@
 
         <joint name="dron/m2_joint" type="revolute">
             <child>dron/m2_prop</child>
-            <parent>dron/body</parent>
+            <parent>base_link</parent>
             <axis>
                 <xyz>0 0 1</xyz>
                 <limit>
@@ -170,7 +195,7 @@
 
         <joint name="dron/m3_joint" type="revolute">
             <child>dron/m3_prop</child>
-            <parent>dron/body</parent>
+            <parent>base_link</parent>
             <axis>
                 <xyz>0 0 1</xyz>
                 <limit>
@@ -187,7 +212,7 @@
 
         <joint name="dron/m4_joint" type="revolute">
             <child>dron/m4_prop</child>
-            <parent>dron/body</parent>
+            <parent>base_link</parent>
             <axis>
                 <xyz>0 0 1</xyz>
                 <limit>
@@ -297,13 +322,6 @@
             linear: {x: 0.05}, angular: {z: 0.0}
             </output>
         </plugin>
-    <plugin
-        filename="ignition-gazebo-actuator-scaler-system"
-        name="ignition::gazebo::systems::ActuatorScaler">
-        <renderer>ogre2</renderer>
-        <sub_topic>actuators</sub_topic>
-        </plugin>
-
     </model>
 </sdf>
     

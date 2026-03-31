@@ -23,6 +23,16 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(DIRECTORY
+  misiones
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(PROGRAMS scripts/mission_handler.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME mission_handler
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
