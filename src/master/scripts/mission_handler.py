@@ -20,7 +20,7 @@ class MissionHandler(Node):
         try:
             default_path = os.path.join(
                 get_package_share_directory('master'), 
-                'misiones', 'prueba.yaml'
+                'misiones', 'escaneo.yaml'
             )
         except:
             default_path = ""
@@ -187,11 +187,13 @@ class MissionHandler(Node):
                 return
 
             z_objetivo = self.pose_despegue_z - height
-            error_altura = abs(self.pose_actual[2] - z_objetivo)
+            # error_altura = abs(self.pose_actual[2] - z_objetivo)
+
+            error_altura = height - abs(self.pose_actual[2])
 
             self.get_logger().info(f"Z actual: {self.pose_actual[2]:.2f} | Z objetivo: {z_objetivo:.2f} | Error: {error_altura:.2f} | Pose despegue z: {self.pose_despegue_z:.2f}")
   
-            if error_altura < 0.3:
+            if error_altura < 0.05:
                 self.get_logger().info("Altura alcanzada")
                 self.idx += 1
                 del self.takeoff_sent
@@ -229,6 +231,7 @@ class MissionHandler(Node):
             x_obj = float(action["x"])
             y_obj = float(action["y"])
             z_obj = float(action["z"])
+            yaw_obj = float(action["yaw"])
             vel = float(action["vel"])
 
             if not hasattr(self, 'offboard_switched') or self.offboard_switched != self.idx:
@@ -255,6 +258,7 @@ class MissionHandler(Node):
 
             setpoint_msg = TrajectorySetpoint()
             setpoint_msg.position = [x_obj, y_obj, z_obj]
+            setpoint_msg.yaw = np.deg2rad(yaw_obj)
             
             # 2. Si estamos lejos, calculamos el vector unitario hacia el objetivo
             if distancia > 0.5:
@@ -263,11 +267,17 @@ class MissionHandler(Node):
                     (dy / distancia) * vel,
                     (dz / distancia) * vel
                 ]
+
+                setpoint_msg.acceleration = [
+                    (dx / distancia) * vel,
+                    (dy / distancia) * vel,
+                    (dz / distancia) * vel
+                ]
+
             else:
                 # Cerca del objetivo, dejamos que PX4 use su propio algoritmo para frenar suavemente
                 setpoint_msg.velocity = [float('nan'), float('nan'), float('nan')]
 
-            setpoint_msg.yaw = 0.0
             setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
             
             self.trajectory_pub.publish(setpoint_msg)
@@ -277,6 +287,124 @@ class MissionHandler(Node):
             # 3. Condición de llegada
             if distancia < 0.3:
                 self.get_logger().info("¡Punto de destino alcanzado!")
+                self.idx += 1
+
+        elif action["type"] == "scan":
+            cajones = int(action["cajones"])
+            filas = int(action["filas"])
+            cajon_x = float(action["cajon_x"])
+            filas_y = float(action["filas_y"])
+            altura = float(action["altura"])
+            vel = float(action["vel"]) 
+            yaw = float(action["yaw"])
+            duracion = float(action["duracion"])
+
+            if not hasattr(self, 'scan_iniciado'):
+                self.scan_iniciado = True
+                self.current_cajon = 0
+                self.current_fila = 0
+                self.scan_origin_x = self.pose_actual[0]
+                self.scan_origin_y = self.pose_actual[1]
+            
+                self.theta = np.deg2rad(yaw)
+                
+                self.get_logger().info(f"Iniciando escaneo rotado a {yaw}°...")
+                return 
+
+            local_x = self.current_cajon * cajon_x
+            local_y = self.current_fila * filas_y
+
+            x_rot = local_x * np.cos(self.theta) - local_y * np.sin(self.theta)
+            y_rot = local_x * np.sin(self.theta) + local_y * np.cos(self.theta)
+
+            x_obj = self.scan_origin_x + x_rot
+            y_obj = self.scan_origin_y + y_rot
+            z_obj = -altura
+
+            dx = x_obj - self.pose_actual[0]
+            dy = y_obj - self.pose_actual[1]
+            dz = z_obj - self.pose_actual[2]
+            distancia = np.sqrt(dx**2 + dy**2 + dz**2)
+
+            setpoint_msg = TrajectorySetpoint()
+            setpoint_msg.position = [x_obj, y_obj, z_obj]
+            setpoint_msg.yaw = self.theta 
+            
+            if distancia > 0.5:
+                setpoint_msg.velocity = [
+                    (dx / distancia) * vel, 
+                    (dy / distancia) * vel, 
+                    (dz / distancia) * vel
+                ]
+            else:
+                setpoint_msg.velocity = [float('nan'), float('nan'), float('nan')]
+
+            setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+            self.trajectory_pub.publish(setpoint_msg)
+            
+            if distancia < 0.3:
+                if not hasattr(self, "hold_start"):
+                    self.get_logger().info(f"Punto reached. Tomando foto en Cajón [{self.current_cajon}, {self.current_fila}]...")
+                    self.hold_start = time.perf_counter()
+                
+                if time.perf_counter() - self.hold_start >= duracion:
+                    self.get_logger().info("Foto tomada. Avanzando...")
+                    del self.hold_start
+                    
+                    self.current_cajon += 1
+
+                    if self.current_cajon >= cajones:
+                        self.current_cajon = 0
+                        self.current_fila += 1
+                        self.get_logger().info(f"Cambiando a la fila {self.current_fila}")
+
+                    if self.current_fila >= filas:
+                        self.get_logger().info("¡Escaneo completo de todo el estacionamiento!")
+                        del self.scan_iniciado
+                        del self.current_cajon
+                        del self.current_fila
+                        del self.scan_origin_x
+                        del self.scan_origin_y
+                        del self.theta
+                        
+                        self.idx += 1
+
+
+        elif action["type"] == "rtb":
+            # El punto de origen en coordenadas locales de PX4 siempre es [0, 0]
+            x_obj = 0.0
+            y_obj = 0.0
+            z_obj = -3.0  # O la altura a la que quieras que regrese
+            vel = 1.5     # Velocidad de regreso a casa
+            
+            # 1. Calculamos distancia al punto de despegue
+            dx = x_obj - self.pose_actual[0]
+            dy = y_obj - self.pose_actual[1]
+            dz = z_obj - self.pose_actual[2]
+            distancia = np.sqrt(dx**2 + dy**2 + dz**2)
+
+            setpoint_msg = TrajectorySetpoint()
+            setpoint_msg.position = [x_obj, y_obj, z_obj]
+            
+            # 2. Aplicamos vector de velocidad para el regreso
+            if distancia > 0.3:
+                setpoint_msg.velocity = [
+                    (dx / distancia) * vel, 
+                    (dy / distancia) * vel, 
+                    (dz / distancia) * vel
+                ]
+            else:
+                setpoint_msg.velocity = [float('nan'), float('nan'), float('nan')]
+
+            setpoint_msg.yaw = 0.0
+            setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+            self.trajectory_pub.publish(setpoint_msg)
+
+            self.get_logger().info(f"Regresando a base... Distancia: {distancia:.2f}m")
+
+            # 3. Al llegar a casa, pasamos a la siguiente acción (que será tu land)
+            if distancia < 0.3:
+                self.get_logger().info("¡Llegamos a la vertical de base!")
                 self.idx += 1
 
                 

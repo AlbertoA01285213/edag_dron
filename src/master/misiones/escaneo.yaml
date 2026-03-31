@@ -16,41 +16,26 @@ actions:
     duration: 5
 
   - type: goto
-    x: -5.0
-    y: 5.0
+    x: -4.0
+    y: 6.9
     z: -3.0
-    yaw: 0.0
+    yaw: 90.0
     vel: 0.1
+
+  - type: scan
+    cajones: 8
+    filas: 2
+    cajon_x: 2.6
+    filas_y: 10.0
+    altura: 3.0
+    vel: 0.1
+    yaw: 90.0
+    duracion: 5
 
   - type: hold
     duration: 5
 
-  - type: goto
-    x: -5.0
-    y: 15.0
-    z: -3.0
-    yaw: -90.0
-    vel: 0.1
-
-  - type: hold
-    duration: 5
-
-  - type: goto
-    x: -15.0
-    y: 15.0
-    z: -3.0
-    yaw: -180.0
-    vel: 0.1
-
-  - type: hold
-    duration: 5
-
-  - type: goto
-    x: -15.0
-    y: 5.0
-    z: -3.0
-    yaw: 180.0
-    vel: 0.1
+  - type: rtb
 
   - type: hold
     duration: 5
