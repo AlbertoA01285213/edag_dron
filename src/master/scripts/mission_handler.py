@@ -59,6 +59,8 @@ class MissionHandler(Node):
         self.command_publisher = self.create_publisher(VehicleCommand, '/fmu/in/vehicle_command', 10)
         self.offboard_publisher = self.create_publisher(OffboardControlMode, '/fmu/in/offboard_control_mode', 10)
 
+        self.tomar_foto_pub = self.create_publisher(Int16, 'take_picture', 10)
+
         self.pose_inicial = self.pose_actual
 
         self.timer = self.create_timer(0.1, self.run)
@@ -346,9 +348,18 @@ class MissionHandler(Node):
                 if not hasattr(self, "hold_start"):
                     self.get_logger().info(f"Punto reached. Tomando foto en Cajón [{self.current_cajon}, {self.current_fila}]...")
                     self.hold_start = time.perf_counter()
+
                 
                 if time.perf_counter() - self.hold_start >= duracion:
                     self.get_logger().info("Foto tomada. Avanzando...")
+
+                    msg_foto = Int16()
+                    msg_foto.data = 1
+                    self.tomar_foto_pub.publish(msg_foto)
+
+                    msg_foto.data = 0
+                    self.tomar_foto_pub.publish(msg_foto)
+                    
                     del self.hold_start
                     
                     self.current_cajon += 1
