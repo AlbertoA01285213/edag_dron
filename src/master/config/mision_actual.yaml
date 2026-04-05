@@ -1,0 +1,24 @@
+mission_parameters:
+  map_reference: WGS84
+  status: ready
+  timestamp: 1775370451.2790806
+points:
+  scan_origin:
+    alt_relative: 4
+    lat: 25.779044404414766
+    lon: -100.06403446197511
+  takeoff:
+    alt_relative: 0.0
+    lat: 25.778967115751946
+    lon: -100.0643241405487
+scan_configuration:
+  cajon_ancho_x: 2.6
+  cajon_largo_y: 5.0
+  dron_yaw: 0
+  foto_duracion_espera: 3.0
+  separacion_filas: 8.0
+  total_cajones_fila: 10
+  total_filas: 2
+  type: rectangle_grid
+  vuelo_altura: 4
+  vuelo_velocidad: 1.5
