@@ -9,7 +9,7 @@ import time
 import os
 import numpy as np
 from ament_index_python.packages import get_package_share_directory
-from px4_msgs.msg import VehicleCommand, VehicleOdometry, VehicleCommandAck, TrajectorySetpoint, OffboardControlMode
+from px4_msgs.msg import VehicleCommand, VehicleOdometry, VehicleCommandAck, TrajectorySetpoint, OffboardControlMode, VehicleLocalPosition
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 
 class MissionHandler(Node):
@@ -48,12 +48,18 @@ class MissionHandler(Node):
         self.pose_actual = [0.0]*6
         self.pose_esperada = [0.0]*6
 
+        self.nuevo_yaw = 0.0
+
+
         self.velocidad_actual = [0.0]*6
 
         self.comando_enviado = 0
 
+        self.current_aruco_error = None
+
         self.create_subscription(VehicleOdometry, '/fmu/out/vehicle_odometry', self.pose_callback, qos_profile)
         self.create_subscription(VehicleCommandAck, '/fmu/out/vehicle_command_ack', self.ack_callback, qos_profile)
+        self.create_subscription(Pose, 'aruco_error', self.aruco_error_callback, 10)
 
         self.trajectory_pub = self.create_publisher(TrajectorySetpoint, '/fmu/in/trajectory_setpoint', 10)
         self.command_publisher = self.create_publisher(VehicleCommand, '/fmu/in/vehicle_command', 10)
@@ -83,12 +89,19 @@ class MissionHandler(Node):
             # self.velocidad_actual[4] = msg.velocity[4]
             # self.velocidad_actual[5] = msg.velocity[5]
 
+            # self.get_logger().info(f"X_local: {self.pose_actual[0]:.2f}, Y_local: {self.pose_actual[1]:.2f}, Z_local: {self.pose_actual[2]:.2f}")
+            # self.get_logger().info(f"RX_local: {self.pose_actual[3]:.2f}, RY_local: {self.pose_actual[4]:.2f}, RZ_local: {self.pose_actual[5]:.2f}")
+
         except Exception as e:
             self.get_logger().error(f"Error en pose_callback: {e}")
+
 
     def ack_callback(self, msg: VehicleCommandAck):
         self.ack_command = msg.command
         self.ack_result = msg.result
+
+    def aruco_error_callback(self, msg):
+        self.current_aruco_error = msg
 
     def run(self):
         offboard_msg = OffboardControlMode()
@@ -290,6 +303,165 @@ class MissionHandler(Node):
             if distancia < 0.3:
                 self.get_logger().info("¡Punto de destino alcanzado!")
                 self.idx += 1
+
+        elif action["type"] == "searchArUco":
+            if not hasattr(self, "alineado"): 
+                self.alineado = False # Bandera para saber si ya terminamos
+            if not hasattr(self, "posicionado"):
+                self.posicionado = True # Bandera para saber si el dron está quieto y puede tomar foto
+
+            if self.posicionado and not hasattr(self, "esperando_foto"):
+                self.get_logger().info("Tomando captura para análisis...")
+                self.tomar_foto_pub.publish(Int16(data=2))
+                self.esperando_foto = True
+                self.current_aruco_error = None # Limpiamos error viejo
+                self.tomar_foto_pub.publish(Int16(data=0))
+                return # Esperamos al siguiente ciclo para ver la respuesta
+            
+                # Empieza
+
+            if hasattr(self, "esperando_foto") and self.current_aruco_error is not None:
+                # Apagamos el trigger de la cámara
+                self.tomar_foto_pub.publish(Int16(data=0))
+                del self.esperando_foto
+                
+                err = self.current_aruco_error
+
+                if err.position.x == 999.0:
+                    # El dron no encontro el Aruco, empezara a rotar hasta encontrarlo
+                    self.get_logger().error("Aruco no encontrado. Rotando 45 grados")
+
+                    target_x = self.pose_actual[0]
+                    target_y = self.pose_actual[1]
+                    target_z = self.pose_actual[2]
+
+                    target_yaw = np.deg2rad(self.pose_actual[3]) - 0.785
+
+                    setpoint_msg = TrajectorySetpoint()
+                    setpoint_msg.position = [float(self.pose_actual[0]), float(self.pose_actual[1]), float(self.pose_actual[2])]
+                    setpoint_msg.yaw = float(target_yaw) # El dron rota 45 grados
+                    setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+                    self.trajectory_pub.publish(setpoint_msg)
+
+                    self.target_vuelo = [target_x, target_y, target_z, target_yaw]
+
+                    self.posicionado = False
+                    self.hold_start = time.perf_counter()
+
+                elif abs(err.position.x) < 0.1 and abs(err.position.y) < 0.05:
+                    self.get_logger().error("🎯 Dron alineado, continuando")
+                    # LIMPIEZA SEGURA
+                    if hasattr(self, "alineado"): del self.alineado
+                    if hasattr(self, "posicionado"): del self.posicionado
+                    self.idx += 1
+                    return
+
+                else:
+                    # En esta condicion encontro el ArUco y se va a posicionar para tener el ArUco en el centro
+                    self.get_logger().info("ArUco encontrado, alineando")
+                    
+                    # Calcula lo que tendra que moverse
+                    kp_lateral = 0.9
+                    kp_altitud = 0.9
+                    kp_yaw = 0.3
+
+                    target_x = self.pose_actual[0] - (err.position.x * kp_lateral)
+                    target_y = self.pose_actual[1] + (err.position.z * kp_lateral)
+                    target_z = self.pose_actual[2] - (err.position.y * kp_altitud)
+
+                    self.get_logger().info(f"Corrigiendo posición. Error X: {err.position.x:.2f}, Y: {err.position.y:.2f}, Z: {err.position.z:.2f}")
+                    
+                    # Da la orden de moverse
+                    setpoint_msg = TrajectorySetpoint()
+                    setpoint_msg.position = [float(target_x), float(target_y), float(target_z)]
+                    setpoint_msg.yaw = np.deg2rad(90)
+                    setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+                    self.trajectory_pub.publish(setpoint_msg)
+
+                    self.target_vuelo = [target_x, target_y, target_z, np.deg2rad(90)]
+
+                    self.posicionado = False
+                    self.hold_start = time.perf_counter()
+
+            if not self.posicionado:
+                distancia = 999.0
+                dyaw = 999.0
+                if hasattr(self, "target_vuelo"):
+                    dx = self.target_vuelo[0] - self.pose_actual[0]
+                    dy = self.target_vuelo[1] - self.pose_actual[1]
+                    dz = self.target_vuelo[2] - self.pose_actual[2]
+                    dyaw = abs(self.target_vuelo[3] - self.pose_actual[3])
+                    distancia = np.sqrt(dx**2 + dy**2 + dz**2)
+                    self.get_logger().info(f"Dist: {distancia:.2f}m, Error Yaw: {np.rad2deg(dyaw):.1f}°")
+
+                if distancia < 0.1 and (dyaw < 0.1):
+                    self.get_logger().info("Posición alcanzada. Estabilizando para foto...")
+                    self.posicionado = True
+                    # if hasattr(self, "target_vuelo"): del self.target_vuelo
+
+
+        elif action["type"] == "scan_2":
+            offset = float(action["offset"])
+            cajones = int(action["cajones"])
+            width = float(action["width"])
+            side = int(action["side"])
+
+            if not hasattr(self, 'scan_iniciado'):
+                self.scan_iniciado = True
+                self.current_cajon = 0
+                self.scan_origin_x = self.pose_actual[0]
+                self.scan_origin_y = self.pose_actual[1]
+                self.scan_origin_z = self.pose_actual[2]
+                self.scan_origin_yaw = self.pose_actual[3]
+            
+                self.theta = self.pose_actual[3]
+
+                self.get_logger().info(f"🚀 Iniciando barrido para {cajones} cajones.")
+                return 
+            
+            if side == 1:
+                y_obj = self.scan_origin_y - cajones * width - offset
+
+            elif side == -1:
+                y_obj = self.scan_origin_y + cajones * width + offset
+
+            x_obj = self.scan_origin_x
+            z_obj = self.scan_origin_z
+            yaw_obj = self.scan_origin_yaw
+
+            setpoint_msg = TrajectorySetpoint()
+            setpoint_msg.position = [float(x_obj), float(y_obj), float(z_obj)]
+            setpoint_msg.yaw = yaw_obj
+            setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+            self.trajectory_pub.publish(setpoint_msg)
+
+            distancia_recorrida = abs(self.pose_actual[1] - self.scan_origin_y)
+            punto_proxima_foto = offset + (self.current_cajon * width)
+
+            if distancia_recorrida >= punto_proxima_foto and self.current_cajon < cajones:
+                self.get_logger().info(f"📸 Tomando foto cajón {self.current_cajon + 1} a {distancia_recorrida:.2f}m")
+
+                self.tomar_foto_pub.publish(Int16(data=2))
+                self.tomar_foto_pub.publish(Int16(data=0))
+                # Nota: El nodo de la cámara debería apagar el flag solo tras guardar
+                
+                self.current_cajon += 1
+
+            
+            dx = x_obj - self.pose_actual[0]
+            dy = y_obj - self.pose_actual[1]
+            dz = z_obj - self.pose_actual[2]
+            
+            distancia = np.sqrt(dx**2 + dy**2 + dz**2)
+
+            if distancia < 0.3:
+                self.get_logger().info("¡Punto de destino alcanzado!")
+                del self.scan_iniciado
+                self.idx += 1
+
+
+
+
 
         elif action["type"] == "scan":
             cajones = int(action["cajones"])

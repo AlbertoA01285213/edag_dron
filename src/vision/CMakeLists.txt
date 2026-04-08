@@ -28,6 +28,16 @@ install(PROGRAMS scripts/foto.py
   RENAME foto
 )
 
+install(PROGRAMS scripts/nodo_camara.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME nodo_camara
+)
+
+install(PROGRAMS scripts/aruco_detector.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME aruco_detector
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

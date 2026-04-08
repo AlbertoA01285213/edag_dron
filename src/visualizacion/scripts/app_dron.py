@@ -1,6 +1,8 @@
 import streamlit as st
 import folium
 from streamlit_folium import st_folium
+import subprocess
+import sys
 import yaml
 import os
 import time
@@ -162,6 +164,9 @@ if st.button("🚀 Generar YAML e INICIAR MISIÓN"):
             
             st.success(f"✅ ¡Misión Generada! Archivo YAML guardado en: {yaml_filename}")
             st.json(mission_data) # Mostrar datos generados para depurar
+
+            # comando = f"ros2 launch master mission_handler.py"
+            # subprocess.run(['bash', f"{'home/alberto/Documents/edag_dron'}"])
             
             # --- AQUÍ IRÍA LA CONEXIÓN MECATRÓNICA ---
             # En la versión final, Streamlit usaría 'subprocess' para lanzar ROS 2

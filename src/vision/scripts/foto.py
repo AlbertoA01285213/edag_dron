@@ -20,9 +20,10 @@ class Picture(Node):
 
         # Publicador para el analizador
         self.img_dron_pub = self.create_publisher(Image, 'image_dron', 10)
+        self.img_aruco_pub = self.create_publisher(Image, 'image_aruco', 10) 
 
         # Asegurar que la carpeta de destino exista
-        self.save_dir = os.path.join(os.path.expanduser('~'), 'Desktop', 'Fotos_dron')
+        self.save_dir = os.path.join(os.path.expanduser('~'), 'Desktop', 'Fotos_dron', 'foto_original')
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
             self.get_logger().info(f"Carpeta creada en: {self.save_dir}")
@@ -50,13 +51,23 @@ class Picture(Node):
 
                     # 3. Guardar imagen
                     cv2.imwrite(save_path, frame_cv2)
-                    self.get_logger().info(f"✅ Imagen {self.count} guardada en: {save_path}")
+                    # self.get_logger().info(f"✅ Imagen {self.count} guardada en: {save_path}")
                     
                     self.count += 1
                 except Exception as e:
                     self.get_logger().error(f"Error al procesar/guardar imagen: {e}")
             else:
                 self.get_logger().warning("Se recibió señal de disparo pero no hay feed de cámara aún.")
+
+        elif msg.data == 2:
+            if self.latest_frame is not None:
+                # 1. Publicar la imagen al analizador inmediatamente
+                self.img_aruco_pub.publish(self.latest_frame)
+                self.get_logger().info("Foto enviada al analizador de aruco")
+
+            else:
+                self.get_logger().warning("Se recibió señal de disparo pero no hay feed de cámara aún.")
+
 
 def main(args=None):
     rclpy.init(args=args)

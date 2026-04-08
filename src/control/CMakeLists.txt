@@ -28,6 +28,11 @@ install(PROGRAMS scripts/armdisarm.py
   RENAME armdisarm
 )
 
+install(PROGRAMS scripts/pose_teller.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME pose_teller
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

@@ -13,24 +13,35 @@ actions:
     height: 2
 
   - type: hold
-    duration: 5
+    duration: 3
 
   - type: goto
-    x: -4.0
-    y: 6.9
+    x: -2.0
+    y: 4.0
     z: -3.0
     yaw: 90.0
     vel: 0.1
 
-  - type: scan
-    cajones: 8
-    filas: 2
-    cajon_x: 2.6
-    filas_y: 10.0
-    altura: 3.0
-    vel: 0.1
-    yaw: 90.0
-    duracion: 5
+  - type: hold
+    duration: 2
+
+  - type: searchArUco
+
+  - type: scan_2
+    offset: 0.9
+    cajones: 6
+    width: 2.6
+    side: -1 # left = -1 | right = 1
+
+  # - type: scan
+  #   cajones: 8
+  #   filas: 2
+  #   cajon_x: 2.6
+  #   filas_y: 10.0
+  #   altura: 3.0
+  #   vel: 0.1
+  #   yaw: 90.0
+  #   duracion: 5
 
   - type: hold
     duration: 5
