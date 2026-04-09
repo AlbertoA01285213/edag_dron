@@ -63,6 +63,8 @@ class ArucoDetector(Node):
             else:
                 self.foto_buffer.append(False)
                 self.get_logger().warn(f"Intento {len(self.foto_buffer)} fallido.")
+                file_path = os.path.join(self.save_dir, f'error_aruco_debug_{self.img_counter}.jpg')
+                cv2.imwrite(file_path, debug_img)
 
                 # Solo si fallamos N veces, mandamos el 999
                 if len(self.foto_buffer) >= self.max_intentos:

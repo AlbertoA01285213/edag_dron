@@ -8,6 +8,7 @@ from tf_transformations import euler_from_quaternion, quaternion_from_euler
 import time
 import os
 import numpy as np
+import math
 from ament_index_python.packages import get_package_share_directory
 from px4_msgs.msg import VehicleCommand, VehicleOdometry, VehicleCommandAck, TrajectorySetpoint, OffboardControlMode, VehicleLocalPosition
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
@@ -78,16 +79,9 @@ class MissionHandler(Node):
             self.pose_actual[2] = msg.position[2]
             quat = [msg.q[0], msg.q[1], msg.q[2], msg.q[3]]
             roll, pitch, yaw = euler_from_quaternion(quat)
-            self.pose_actual[3] = roll
+            self.pose_actual[3] = self.from_drone_yaw(roll)
             self.pose_actual[4] = pitch
             self.pose_actual[5] = yaw
-
-            self.velocidad_actual[0] = msg.velocity[0]
-            self.velocidad_actual[1] = msg.velocity[1]
-            self.velocidad_actual[2] = msg.velocity[2]
-            # self.velocidad_actual[3] = msg.velocity[3]
-            # self.velocidad_actual[4] = msg.velocity[4]
-            # self.velocidad_actual[5] = msg.velocity[5]
 
             # self.get_logger().info(f"X_local: {self.pose_actual[0]:.2f}, Y_local: {self.pose_actual[1]:.2f}, Z_local: {self.pose_actual[2]:.2f}")
             # self.get_logger().info(f"RX_local: {self.pose_actual[3]:.2f}, RY_local: {self.pose_actual[4]:.2f}, RZ_local: {self.pose_actual[5]:.2f}")
@@ -103,6 +97,44 @@ class MissionHandler(Node):
     def aruco_error_callback(self, msg):
         self.current_aruco_error = msg
 
+    def to_drone_yaw(self, mission_yaw):
+        """Convierte el ángulo de tu lógica al que entiende PX4."""
+        # Según tus pruebas: Input 0 (Sur) -> Output 180 (Sur)
+        # La relación es una rotación de pi (180 grados)
+        return self.normalize_angle(mission_yaw + np.pi)
+
+    def from_drone_yaw(self, drone_yaw):
+        """Convierte lo que dice la odometría a tu lógica de misión."""
+        return self.normalize_angle(drone_yaw - np.pi)
+
+    def normalize_angle(self, angle):
+        return math.atan2(math.sin(angle), math.cos(angle))
+
+    def send_setpoint(self, x, y, z, yaw_rad):
+        # drone_yaw = self.to_drone_yaw(yaw_rad)
+        drone_yaw = yaw_rad
+        msg = TrajectorySetpoint()
+        msg.position = [float(x), float(y), float(z)]
+        msg.yaw = float(drone_yaw)
+        msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+        self.trajectory_pub.publish(msg)
+
+        self.target_vuelo = [float(x), float(y), float(z), float(yaw_rad)]
+
+    def get_global_coordinates(self, forward, right, down):
+        # Convierte distancias relativas al cuerpo del dron (Body Frame) a coordenadas globales del mundo (NED) basadas en el Yaw actual.
+        yaw = self.pose_actual[3]
+        
+        delta_norte = (forward * np.cos(yaw)) - (right * np.sin(yaw))
+        delta_este  = (forward * np.sin(yaw)) + (right * np.cos(yaw))
+        
+        target_x = float(self.pose_actual[0] + delta_norte)
+        target_y = float(self.pose_actual[1] + delta_este)
+        target_z = float(self.pose_actual[2] + down)
+        target_yaw = float(yaw)
+        
+        return target_x, target_y, target_z, target_yaw
+
     def run(self):
         offboard_msg = OffboardControlMode()
         offboard_msg.position = True
@@ -112,6 +144,22 @@ class MissionHandler(Node):
         offboard_msg.body_rate = False
         offboard_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.offboard_publisher.publish(offboard_msg)
+
+        if not hasattr(self, 'offboard_switched') or self.offboard_switched != self.idx:
+                msg = VehicleCommand()
+                msg.command = VehicleCommand.VEHICLE_CMD_DO_SET_MODE
+                msg.param1 = 1.0  # Custom mode
+                msg.param2 = 6.0  # Offboard
+                msg.target_system = 1
+                msg.target_component = 1
+                msg.source_system = 1
+                msg.source_component = 1
+                msg.from_external = True
+                msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+                self.command_publisher.publish(msg)
+                
+                self.offboard_switched = self.idx
+                self.get_logger().info("Solicitando cambio a modo Offboard...")
 
         if self.idx >= len(self.actions):
         # Es para declarar que la mision ha terminadl
@@ -164,7 +212,6 @@ class MissionHandler(Node):
 
             self.idx += 1
 
-
         elif action["type"] == "disarm":
             msg = VehicleCommand()
             msg.command = VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM
@@ -208,7 +255,7 @@ class MissionHandler(Node):
 
             self.get_logger().info(f"Z actual: {self.pose_actual[2]:.2f} | Z objetivo: {z_objetivo:.2f} | Error: {error_altura:.2f} | Pose despegue z: {self.pose_despegue_z:.2f}")
   
-            if error_altura < 0.05:
+            if error_altura < 0.1:
                 self.get_logger().info("Altura alcanzada")
                 self.idx += 1
                 del self.takeoff_sent
@@ -247,23 +294,6 @@ class MissionHandler(Node):
             y_obj = float(action["y"])
             z_obj = float(action["z"])
             yaw_obj = float(action["yaw"])
-            vel = float(action["vel"])
-
-            if not hasattr(self, 'offboard_switched') or self.offboard_switched != self.idx:
-                msg = VehicleCommand()
-                msg.command = VehicleCommand.VEHICLE_CMD_DO_SET_MODE
-                msg.param1 = 1.0  # Custom mode
-                msg.param2 = 6.0  # Offboard
-                msg.target_system = 1
-                msg.target_component = 1
-                msg.source_system = 1
-                msg.source_component = 1
-                msg.from_external = True
-                msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                self.command_publisher.publish(msg)
-                
-                self.offboard_switched = self.idx
-                self.get_logger().info("Solicitando cambio a modo Offboard...")
 
             # 1. Calcular la distancia y dirección real hacia el objetivo
             dx = x_obj - self.pose_actual[0]
@@ -275,24 +305,6 @@ class MissionHandler(Node):
             setpoint_msg.position = [x_obj, y_obj, z_obj]
             setpoint_msg.yaw = np.deg2rad(yaw_obj)
             
-            # 2. Si estamos lejos, calculamos el vector unitario hacia el objetivo
-            if distancia > 0.5:
-                setpoint_msg.velocity = [
-                    (dx / distancia) * vel,
-                    (dy / distancia) * vel,
-                    (dz / distancia) * vel
-                ]
-
-                setpoint_msg.acceleration = [
-                    (dx / distancia) * vel,
-                    (dy / distancia) * vel,
-                    (dz / distancia) * vel
-                ]
-
-            else:
-                # Cerca del objetivo, dejamos que PX4 use su propio algoritmo para frenar suavemente
-                setpoint_msg.velocity = [float('nan'), float('nan'), float('nan')]
-
             setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
             
             self.trajectory_pub.publish(setpoint_msg)
@@ -348,7 +360,7 @@ class MissionHandler(Node):
                     self.posicionado = False
                     self.hold_start = time.perf_counter()
 
-                elif abs(err.position.x) < 0.1 and abs(err.position.y) < 0.05:
+                elif abs(err.position.x) < 0.05 and abs(err.position.y) < 0.05:
                     self.get_logger().error("🎯 Dron alineado, continuando")
                     # LIMPIEZA SEGURA
                     if hasattr(self, "alineado"): del self.alineado
@@ -359,26 +371,23 @@ class MissionHandler(Node):
                 else:
                     # En esta condicion encontro el ArUco y se va a posicionar para tener el ArUco en el centro
                     self.get_logger().info("ArUco encontrado, alineando")
+                    self.get_logger().info(f"Error de referencia de arucos. X: {err.position.x:.2f}, Y: {err.position.y:.2f}, Z: {err.position.z:.2f},")
                     
                     # Calcula lo que tendra que moverse
-                    kp_lateral = 0.9
-                    kp_altitud = 0.9
-                    kp_yaw = 0.3
+                    fwd = err.position.z * 0.7
+                    rgt = err.position.x * 0.7
+                    dwn = -err.position.y * 0.8
 
-                    target_x = self.pose_actual[0] - (err.position.x * kp_lateral)
-                    target_y = self.pose_actual[1] + (err.position.z * kp_lateral)
-                    target_z = self.pose_actual[2] - (err.position.y * kp_altitud)
+                    tx, ty, tz, tyaw = self.get_global_coordinates(fwd, rgt, dwn)
 
-                    self.get_logger().info(f"Corrigiendo posición. Error X: {err.position.x:.2f}, Y: {err.position.y:.2f}, Z: {err.position.z:.2f}")
+                    self.get_logger().info(f"Waypoint. X: {tx:.2f}, Y: {ty:.2f}, Z: {tz:.2f},")
+                    self.get_logger().info(f"Posicion actual. X: {self.pose_actual[0]:.2f}, Y: {self.pose_actual[1]:.2f}, Z: {self.pose_actual[2]:.2f},")
                     
-                    # Da la orden de moverse
-                    setpoint_msg = TrajectorySetpoint()
-                    setpoint_msg.position = [float(target_x), float(target_y), float(target_z)]
-                    setpoint_msg.yaw = np.deg2rad(90)
-                    setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                    self.trajectory_pub.publish(setpoint_msg)
+                    target_yaw = self.normalize_angle(tyaw)
 
-                    self.target_vuelo = [target_x, target_y, target_z, np.deg2rad(90)]
+                    self.get_logger().info(f"YAW ACTUAL: {self.pose_actual[3]:.2f} | YAW ENVIADO: {target_yaw:.2f}")
+
+                    self.send_setpoint(tx, ty, tz, tyaw)
 
                     self.posicionado = False
                     self.hold_start = time.perf_counter()
@@ -392,7 +401,7 @@ class MissionHandler(Node):
                     dz = self.target_vuelo[2] - self.pose_actual[2]
                     dyaw = abs(self.target_vuelo[3] - self.pose_actual[3])
                     distancia = np.sqrt(dx**2 + dy**2 + dz**2)
-                    self.get_logger().info(f"Dist: {distancia:.2f}m, Error Yaw: {np.rad2deg(dyaw):.1f}°")
+                    # self.get_logger().info(f"Dist: {distancia:.2f}m, Error Yaw: {np.rad2deg(dyaw):.1f}°")
 
                 if distancia < 0.1 and (dyaw < 0.1):
                     self.get_logger().info("Posición alcanzada. Estabilizando para foto...")
@@ -441,7 +450,7 @@ class MissionHandler(Node):
             if distancia_recorrida >= punto_proxima_foto and self.current_cajon < cajones:
                 self.get_logger().info(f"📸 Tomando foto cajón {self.current_cajon + 1} a {distancia_recorrida:.2f}m")
 
-                self.tomar_foto_pub.publish(Int16(data=2))
+                self.tomar_foto_pub.publish(Int16(data=1))
                 self.tomar_foto_pub.publish(Int16(data=0))
                 # Nota: El nodo de la cámara debería apagar el flag solo tras guardar
                 
@@ -458,6 +467,77 @@ class MissionHandler(Node):
                 self.get_logger().info("¡Punto de destino alcanzado!")
                 del self.scan_iniciado
                 self.idx += 1
+
+
+        elif action["type"] == "changeLine":
+            offset = float(action["offset"])
+            length = float(action["length"])
+            rotation = float(action["rotate"])
+
+            if not hasattr(self, 'change_line_iniciado'):
+                self.change_line_iniciado = True
+                self.sub_step = 1
+                
+                self.start_x = self.pose_actual[0]
+                self.start_y = self.pose_actual[1]
+                self.start_z = self.pose_actual[2]
+                self.start_yaw = self.pose_actual[3]                
+                return
+
+            # Definimos variables de objetivo para el paso actual
+            target_x, target_y, target_z, target_yaw = 0.0, 0.0, 0.0, 0.0
+
+            # --- 2. MÁQUINA DE ESTADOS (3 PASOS) ---
+            
+            if self.sub_step == 1:
+                # PASO 1: Subir 2 metros (Seguridad)
+                target_x = self.start_x
+                target_y = self.start_y
+                target_z = self.start_z - 2.0 # En NED, Z negativo es subir
+                target_yaw = self.start_yaw
+                label = "Subiendo por seguridad"
+
+            elif self.sub_step == 2:
+                # PASO 2: Movimiento Lateral (Cambio de fila)
+                # Asumimos que el movimiento es en el eje Y relativo al dron
+                # (Ajusta los ejes según cómo esté orientada tu fila)
+                target_x = self.start_x + length + offset
+                target_y = self.start_y
+                target_z = self.start_z - 2.0
+                target_yaw = self.start_yaw
+                label = "Moviéndose a la siguiente fila"
+
+            elif self.sub_step == 3:
+                # PASO 3: Bajar y Rotar
+                target_x = self.start_x + length + offset
+                target_y = self.start_y
+                target_z = self.start_z # Volvemos a la altura de escaneo
+                target_yaw = self.start_yaw + 3.14
+                label = "Bajando y rotando a nueva fila"
+
+            # --- 3. EJECUCIÓN DEL MOVIMIENTO ---
+            setpoint_msg = TrajectorySetpoint()
+            setpoint_msg.position = [float(target_x), float(target_y), float(target_z)]
+            setpoint_msg.yaw = float(target_yaw)
+            setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+            self.trajectory_pub.publish(setpoint_msg)
+
+            # --- 4. CONDICIÓN DE TRANSICIÓN ---
+            dx = target_x - self.pose_actual[0]
+            dy = target_y - self.pose_actual[1]
+            dz = target_z - self.pose_actual[2]
+            distancia = np.sqrt(dx**2 + dy**2 + dz**2)
+
+            if distancia < 0.3:
+                self.get_logger().info(f"✅ Paso {self.sub_step} completado: {label}")
+                self.sub_step += 1
+                
+                # Si terminamos los 3 pasos, cerramos la acción
+                if self.sub_step > 3:
+                    self.get_logger().info("🏁 Cambio de fila finalizado.")
+                    del self.change_line_iniciado
+                    del self.sub_step
+                    self.idx += 1
 
 
 

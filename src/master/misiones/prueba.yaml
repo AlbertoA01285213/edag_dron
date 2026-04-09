@@ -10,50 +10,25 @@ actions:
     duration: 5
 
   - type: takeoff
-    height: 2
+    height: 3
 
   - type: hold
     duration: 5
 
   - type: goto
-    x: -5.0
-    y: 5.0
-    z: -3.0
+    x: 2.0
+    y: -5.3
+    z: -2.5
     yaw: 0.0
-    vel: 0.1
 
   - type: hold
     duration: 5
 
-  - type: goto
-    x: -5.0
-    y: 15.0
-    z: -3.0
-    yaw: -90.0
-    vel: 0.1
+  - type: searchArUco
+
 
   - type: hold
-    duration: 5
-
-  - type: goto
-    x: -15.0
-    y: 15.0
-    z: -3.0
-    yaw: -180.0
-    vel: 0.1
-
-  - type: hold
-    duration: 5
-
-  - type: goto
-    x: -15.0
-    y: 5.0
-    z: -3.0
-    yaw: 180.0
-    vel: 0.1
-
-  - type: hold
-    duration: 5
+    duration: 20
 
   - type: land
 
