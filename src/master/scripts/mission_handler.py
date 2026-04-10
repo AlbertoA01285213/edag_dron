@@ -360,7 +360,7 @@ class MissionHandler(Node):
                     self.posicionado = False
                     self.hold_start = time.perf_counter()
 
-                elif abs(err.position.x) < 0.05 and abs(err.position.y) < 0.05:
+                elif abs(err.position.x) < 0.07 and abs(err.position.y) < 0.05:
                     self.get_logger().error("🎯 Dron alineado, continuando")
                     # LIMPIEZA SEGURA
                     if hasattr(self, "alineado"): del self.alineado
@@ -403,7 +403,7 @@ class MissionHandler(Node):
                     distancia = np.sqrt(dx**2 + dy**2 + dz**2)
                     # self.get_logger().info(f"Dist: {distancia:.2f}m, Error Yaw: {np.rad2deg(dyaw):.1f}°")
 
-                if distancia < 0.1 and (dyaw < 0.1):
+                if distancia < 0.1:
                     self.get_logger().info("Posición alcanzada. Estabilizando para foto...")
                     self.posicionado = True
                     # if hasattr(self, "target_vuelo"): del self.target_vuelo
@@ -470,6 +470,7 @@ class MissionHandler(Node):
 
 
         elif action["type"] == "changeLine":
+            variant = int(action["variant"])
             offset = float(action["offset"])
             length = float(action["length"])
             rotation = float(action["rotate"])
@@ -483,46 +484,44 @@ class MissionHandler(Node):
                 self.start_z = self.pose_actual[2]
                 self.start_yaw = self.pose_actual[3]                
                 return
-
-            # Definimos variables de objetivo para el paso actual
-            target_x, target_y, target_z, target_yaw = 0.0, 0.0, 0.0, 0.0
-
-            # --- 2. MÁQUINA DE ESTADOS (3 PASOS) ---
             
-            if self.sub_step == 1:
-                # PASO 1: Subir 2 metros (Seguridad)
-                target_x = self.start_x
-                target_y = self.start_y
-                target_z = self.start_z - 2.0 # En NED, Z negativo es subir
-                target_yaw = self.start_yaw
-                label = "Subiendo por seguridad"
+            target_x, target_y, target_z, target_yaw = 0.0, 0.0, 0.0, 0.0 
 
-            elif self.sub_step == 2:
-                # PASO 2: Movimiento Lateral (Cambio de fila)
-                # Asumimos que el movimiento es en el eje Y relativo al dron
-                # (Ajusta los ejes según cómo esté orientada tu fila)
-                target_x = self.start_x + length + offset
-                target_y = self.start_y
-                target_z = self.start_z - 2.0
-                target_yaw = self.start_yaw
-                label = "Moviéndose a la siguiente fila"
+            if variant == 1:  
+                self.sub_idx = 3         
+                if self.sub_step == 1:
+                    target_x = self.start_x
+                    target_y = self.start_y
+                    target_z = self.start_z - 2.0
+                    target_yaw = self.start_yaw
+                    label = "Subiendo por seguridad"
 
-            elif self.sub_step == 3:
-                # PASO 3: Bajar y Rotar
-                target_x = self.start_x + length + offset
-                target_y = self.start_y
-                target_z = self.start_z # Volvemos a la altura de escaneo
-                target_yaw = self.start_yaw + 3.14
-                label = "Bajando y rotando a nueva fila"
+                elif self.sub_step == 2:
+                    target_x = self.start_x + length + offset
+                    target_y = self.start_y
+                    target_z = self.start_z - 2.0
+                    target_yaw = self.start_yaw
+                    label = "Moviéndose a la siguiente fila"
 
-            # --- 3. EJECUCIÓN DEL MOVIMIENTO ---
-            setpoint_msg = TrajectorySetpoint()
-            setpoint_msg.position = [float(target_x), float(target_y), float(target_z)]
-            setpoint_msg.yaw = float(target_yaw)
-            setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-            self.trajectory_pub.publish(setpoint_msg)
+                elif self.sub_step == 3:
+                    target_x = self.start_x + length + offset
+                    target_y = self.start_y
+                    target_z = self.start_z
+                    target_yaw = self.start_yaw + 3.14
+                    label = "Bajando y rotando a nueva fila"
+            
+            elif variant == 2:
+                self.sub_idx = 1 
+                if self.sub_step == 1:
+                    target_x = self.start_x
+                    target_y = self.start_y
+                    target_z = self.start_z
+                    target_yaw = self.start_yaw - 3.14
+                    label = "Subiendo por seguridad"
 
-            # --- 4. CONDICIÓN DE TRANSICIÓN ---
+
+            self.send_setpoint(target_x, target_y, target_z, target_yaw)
+
             dx = target_x - self.pose_actual[0]
             dy = target_y - self.pose_actual[1]
             dz = target_z - self.pose_actual[2]
@@ -533,14 +532,11 @@ class MissionHandler(Node):
                 self.sub_step += 1
                 
                 # Si terminamos los 3 pasos, cerramos la acción
-                if self.sub_step > 3:
+                if self.sub_step > self.sub_idx:
                     self.get_logger().info("🏁 Cambio de fila finalizado.")
                     del self.change_line_iniciado
                     del self.sub_step
                     self.idx += 1
-
-
-
 
 
         elif action["type"] == "scan":
@@ -634,41 +630,51 @@ class MissionHandler(Node):
 
 
         elif action["type"] == "rtb":
-            # El punto de origen en coordenadas locales de PX4 siempre es [0, 0]
-            x_obj = 0.0
-            y_obj = 0.0
-            z_obj = -3.0  # O la altura a la que quieras que regrese
-            vel = 1.5     # Velocidad de regreso a casa
+            if not hasattr(self, 'change_line_iniciado'):
+                self.change_line_iniciado = True
+                self.sub_step = 1
+                
+                self.start_x = self.pose_actual[0]
+                self.start_y = self.pose_actual[1]
+                self.start_z = self.pose_actual[2]
+                self.start_yaw = self.pose_actual[3]                
+                return
             
-            # 1. Calculamos distancia al punto de despegue
-            dx = x_obj - self.pose_actual[0]
-            dy = y_obj - self.pose_actual[1]
-            dz = z_obj - self.pose_actual[2]
+            target_x, target_y, target_z, target_yaw = 0.0, 0.0, 0.0, 0.0 
+ 
+            self.sub_idx = 2         
+            if self.sub_step == 1:
+                target_x = self.start_x
+                target_y = self.start_y
+                target_z = self.start_z - 2.0
+                target_yaw = self.start_yaw
+                label = "Subiendo por seguridad"
+
+            elif self.sub_step == 2:
+                target_x = 0
+                target_y = 0
+                target_z = self.start_z - 2.0
+                target_yaw = self.start_yaw
+                label = "Moviéndose a la siguiente fila"
+
+
+            self.send_setpoint(target_x, target_y, target_z, target_yaw)
+
+            dx = target_x - self.pose_actual[0]
+            dy = target_y - self.pose_actual[1]
+            dz = target_z - self.pose_actual[2]
             distancia = np.sqrt(dx**2 + dy**2 + dz**2)
 
-            setpoint_msg = TrajectorySetpoint()
-            setpoint_msg.position = [x_obj, y_obj, z_obj]
-            
-            # 2. Aplicamos vector de velocidad para el regreso
-            if distancia > 0.3:
-                setpoint_msg.velocity = [
-                    (dx / distancia) * vel, 
-                    (dy / distancia) * vel, 
-                    (dz / distancia) * vel
-                ]
-            else:
-                setpoint_msg.velocity = [float('nan'), float('nan'), float('nan')]
-
-            setpoint_msg.yaw = 0.0
-            setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-            self.trajectory_pub.publish(setpoint_msg)
-
-            self.get_logger().info(f"Regresando a base... Distancia: {distancia:.2f}m")
-
-            # 3. Al llegar a casa, pasamos a la siguiente acción (que será tu land)
             if distancia < 0.3:
-                self.get_logger().info("¡Llegamos a la vertical de base!")
-                self.idx += 1
+                self.get_logger().info(f"✅ Paso {self.sub_step} completado: {label}")
+                self.sub_step += 1
+                
+                # Si terminamos los 3 pasos, cerramos la acción
+                if self.sub_step > self.sub_idx:
+                    self.get_logger().info("🏁 Cambio de fila finalizado.")
+                    del self.change_line_iniciado
+                    del self.sub_step
+                    self.idx += 1
 
                 
         elif action["type"] == "hold":

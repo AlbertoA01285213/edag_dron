@@ -16,10 +16,10 @@ actions:
     duration: 5
 
   - type: goto
-    x: 2.0
-    y: -5.3
+    x: 17.0
+    y: -4.5
     z: -2.5
-    yaw: 0.0
+    yaw: 180.0
 
   - type: hold
     duration: 5
@@ -28,7 +28,7 @@ actions:
 
 
   - type: hold
-    duration: 20
+    duration: 10
 
   - type: land
 

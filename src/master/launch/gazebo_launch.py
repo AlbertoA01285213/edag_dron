@@ -41,6 +41,12 @@ def generate_launch_description():
                 executable='foto',
                 # parameters=[{'use_sim_time': True}],
                 output='screen')])
+    
+    pose_traducer = TimerAction(period=7.0,actions=[Node(
+                package='control',
+                executable='pose_teller'
+                # parameters=[{'use_sim_time': True}],
+                )])
 
     return LaunchDescription([
         LogInfo(msg="🚀 Iniciando ecosistema completo del Dron..."),
@@ -49,5 +55,6 @@ def generate_launch_description():
         nodo_camara,
         aruco_detector,
         mission_handler,
-        foto
+        foto,
+        pose_traducer
     ])

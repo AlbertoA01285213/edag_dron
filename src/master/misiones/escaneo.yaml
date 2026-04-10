@@ -40,13 +40,16 @@ actions:
   - type: hold
     duration: 2
 
+# Segunda fila
+
   - type: changeLine
+    variant: 1
     offset: 2.0
-    length: 10
+    length: 13
     rotate: 180
 
   - type: hold
-    duration: 2
+    duration: 5
 
   - type: searchArUco
 
@@ -60,6 +63,66 @@ actions:
     duration: 5
 
   - type: searchArUco
+
+  - type: hold
+    duration: 2
+
+# Tercera fila
+
+  - type: changeLine
+    variant: 2
+    offset: 2.0
+    length: 13
+    rotate: 180
+
+  - type: hold
+    duration: 5
+
+  - type: hold
+    duration: 2
+
+  - type: searchArUco
+
+  - type: scan_2
+    offset: 0.95
+    cajones: 6
+    width: 2.6
+    side: 1 # left = -1 | right = 1
+
+  - type: hold
+    duration: 8
+
+  - type: searchArUco
+
+  - type: hold
+    duration: 2
+
+# Cuarta fila
+
+  - type: changeLine
+    variant: 1
+    offset: 2.0
+    length: 13
+    rotate: 180
+
+  - type: hold
+    duration: 5
+
+  - type: searchArUco
+
+  - type: scan_2
+    offset: 0.95
+    cajones: 6
+    width: 2.6
+    side: -1 # left = -1 | right = 1
+
+  - type: hold
+    duration: 5
+
+  - type: searchArUco
+
+  - type: hold
+    duration: 2
   
   - type: rtb
 
