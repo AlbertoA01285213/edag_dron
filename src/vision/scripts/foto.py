@@ -14,6 +14,9 @@ class Picture(Node):
         self.count = 0
         self.latest_frame = None  # Aquí guardaremos el objeto de imagen de ROS
 
+        self.frame_skip_count = 0
+        self.skip_n_frames = 2
+
         # Suscripciones
         self.create_subscription(Int16, 'take_picture', self.trigger_callback, 10)
         self.create_subscription(Image, 'camara_dron/image_raw', self.camara_feed_callback, 10)
@@ -21,6 +24,7 @@ class Picture(Node):
         # Publicador para el analizador
         self.img_dron_pub = self.create_publisher(Image, 'image_dron', 10)
         self.img_aruco_pub = self.create_publisher(Image, 'image_aruco', 10) 
+        self.low_res_feed_pub = self.create_publisher(Image, 'low_res_feed', 10)
 
         # Asegurar que la carpeta de destino exista
         self.save_dir = os.path.join(os.path.expanduser('~'), 'Desktop', 'Fotos_dron', 'foto_original')
@@ -33,6 +37,25 @@ class Picture(Node):
     def camara_feed_callback(self, msg):
         # Guardamos el mensaje completo de la imagen
         self.latest_frame = msg
+
+        self.frame_skip_count += 1
+        if self.frame_skip_count >= self.skip_n_frames:
+            try:
+                # 1. Convertir a OpenCV
+                cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+                
+                # 2. Redimensionar
+                cv_image_resized = cv2.resize(cv_image, (640, 360))
+
+                # 3. CONVERSIÓN CORRECTA A MENSAJE ROS
+                # Es vital usar bridge.cv2_to_imgmsg para reconstruir el header
+                low_res_msg = self.bridge.cv2_to_imgmsg(cv_image_resized, encoding="bgr8")
+                low_res_msg.header = msg.header # Mantener el timestamp original
+                
+                self.low_res_feed_pub.publish(low_res_msg)
+                self.frame_skip_count = 0 # Reiniciar contador
+            except Exception as e:
+                self.get_logger().error(f"Error en low_res: {e}")
 
     def trigger_callback(self, msg):
         # Si recibimos un 1 y tenemos una imagen guardada en el buffer

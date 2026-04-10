@@ -12,6 +12,10 @@ find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(action_msgs REQUIRED)
+find_package(unique_identifier_msgs REQUIRED)
 
 install(DIRECTORY
   launch
@@ -32,6 +36,12 @@ install(PROGRAMS scripts/mission_handler.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME mission_handler
 )
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/ConfigurarVuelo.srv"
+  DEPENDENCIES action_msgs unique_identifier_msgs geometry_msgs nav_msgs sensor_msgs
+)
+ament_export_dependencies(rosidl_default_runtime)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

@@ -1,0 +1,9 @@
+# ConfigurarVuelo.srv
+bool iniciar           # True para iniciar, False para detener
+float64 altura_vuelo   # Altura de despegue en metros
+float64 velocidad_max  # Velocidad máxima en m/s
+float64 largo_cajon    # Largo del área de estacionamiento
+float64 ancho_cajon    # Ancho del área de estacionamiento
+---
+bool success           # True si se ejecutó correctamente
+string message         # Mensaje de estado
