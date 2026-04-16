@@ -188,3 +188,6 @@ commander arm -f                # Armar dron
 
 ## Notas
 Aqui pueden poner notas y observaciones para que todos estemos al tanto de lo que esta pasando, detalles, modificaciones y cualquier cosa que se ocupe. Obvio avisar en whatsapp tambien para darnos cuenta.
+
+COM_DISARM_PRFLT
+param set MPC_XY_VEL_MAX 1.5

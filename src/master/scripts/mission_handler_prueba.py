@@ -190,11 +190,7 @@ class MissionHandler(Node):
         offboard_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.offboard_publisher.publish(offboard_msg)
 
-        if not self.mision_iniciada:
-            self.send_setpoint(0.0, 0.0, 0.0, 0.0)
-            return
-
-        elif self.mision_iniciada == True:
+        if self.mision_iniciada == True:
         
             
             # offboard_msg = OffboardControlMode()
@@ -289,49 +285,37 @@ class MissionHandler(Node):
                 self.command_publisher.publish(msg)
                 self.idx += 1
 
-            # elif action["type"] == "takeoff":
-            #     height = float(action["height"])
-            #     if not hasattr(self, 'takeoff_sent'):
-            #         self.pose_despegue_z = self.pose_actual[2]
-
-            #         msg = VehicleCommand()
-            #         msg.command = VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF
-            #         msg.param7 = float(height)
-            #         msg.target_system = 1
-            #         msg.target_component = 1
-            #         msg.source_system = 1
-            #         msg.source_component = 1
-            #         msg.from_external = True
-            #         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-            #         self.command_publisher.publish(msg)
-
-            #         self.takeoff_sent = True
-            #         self.get_logger().info(f"Comando de despegue enviado. Altura inicial: {self.pose_despegue_z:.2f}")
-            #         return
-
-            #     z_objetivo = self.pose_despegue_z - height
-            #     # error_altura = abs(self.pose_actual[2] - z_objetivo)
-
-            #     error_altura = height - abs(self.pose_actual[2])
-
-            #     # self.get_logger().info(f"Z actual: {self.pose_actual[2]:.2f} | Z objetivo: {z_objetivo:.2f} | Error: {error_altura:.2f} | Pose despegue z: {self.pose_despegue_z:.2f}")
-    
-            #     if error_altura < 0.1:
-            #         self.get_logger().info("Altura alcanzada")
-            #         self.idx += 1
-            #         del self.takeoff_sent
-
             elif action["type"] == "takeoff":
-                height = float(action["height"]) # Ejemplo: 2.0
-                
-                # En NED, subir es Z negativo. 
-                # Mandamos el dron a X=0, Y=0, Z=-height
-                self.send_setpoint(0.0, 0.0, -height, 0.0)
+                height = float(action["height"])
+                if not hasattr(self, 'takeoff_sent'):
+                    self.pose_despegue_z = self.pose_actual[2]
 
-                # Revisamos si ya llegó (usando el valor absoluto de la pose actual en Z)
-                if abs(self.pose_actual[2]) >= (height - 0.2):
-                    self.get_logger().info("🚀 ¡Altura de despegue alcanzada!")
+                    msg = VehicleCommand()
+                    msg.command = VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF
+                    msg.param7 = float(height)
+                    msg.target_system = 1
+                    msg.target_component = 1
+                    msg.source_system = 1
+                    msg.source_component = 1
+                    msg.from_external = True
+                    msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+                    self.command_publisher.publish(msg)
+
+                    self.takeoff_sent = True
+                    self.get_logger().info(f"Comando de despegue enviado. Altura inicial: {self.pose_despegue_z:.2f}")
+                    return
+
+                z_objetivo = self.pose_despegue_z - height
+                # error_altura = abs(self.pose_actual[2] - z_objetivo)
+
+                error_altura = height - abs(self.pose_actual[2])
+
+                # self.get_logger().info(f"Z actual: {self.pose_actual[2]:.2f} | Z objetivo: {z_objetivo:.2f} | Error: {error_altura:.2f} | Pose despegue z: {self.pose_despegue_z:.2f}")
+    
+                if error_altura < 0.1:
+                    self.get_logger().info("Altura alcanzada")
                     self.idx += 1
+                    del self.takeoff_sent
 
             elif action["type"] == "land":
                 if not hasattr(self, 'land_sent'):

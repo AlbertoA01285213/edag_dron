@@ -6,8 +6,8 @@ actions:
 
   - type: arm
 
-  - type: hold
-    duration: 5
+  # - type: hold
+  #   duration: 0.5
 
   - type: takeoff
     height: 2
