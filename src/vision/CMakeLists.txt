@@ -38,6 +38,11 @@ install(PROGRAMS scripts/aruco_detector.py
   RENAME aruco_detector
 )
 
+install(PROGRAMS scripts/qr_detector.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME qr_detector
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

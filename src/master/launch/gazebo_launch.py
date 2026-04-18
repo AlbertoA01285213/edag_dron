@@ -36,7 +36,7 @@ def generate_launch_description():
     px4_sitl = ExecuteProcess(
         cmd=['make', 'px4_sitl', 'gz_x500'],
         cwd=px4_autopilot_dir,
-        additional_env={'GZ_VERSION': 'harmonic'},
+        additional_env={'GZ_VERSION': 'harmonic', 'PX4_GZ_VIEW_MODEL': ''},
         output='screen')
     
 
@@ -55,6 +55,12 @@ def generate_launch_description():
     aruco_detector = TimerAction(period=7.0, actions=[Node(
                 package='vision',
                 executable='aruco_detector',
+                # parameters=[{'use_sim_time': True}],
+                output='screen')])
+    
+    qr_detector = TimerAction(period=7.0, actions=[Node(
+                package='vision',
+                executable='qr_detector',
                 # parameters=[{'use_sim_time': True}],
                 output='screen')])
 
@@ -78,6 +84,7 @@ def generate_launch_description():
         gui,
         nodo_camara,
         aruco_detector,
+        qr_detector,
         mission_handler,
         foto,
         pose_traducer

@@ -196,16 +196,6 @@ class MissionHandler(Node):
 
         elif self.mision_iniciada == True:
         
-            
-            # offboard_msg = OffboardControlMode()
-            # offboard_msg.position = True
-            # offboard_msg.velocity = False
-            # offboard_msg.acceleration = False
-            # offboard_msg.attitude = False
-            # offboard_msg.body_rate = False
-            # offboard_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-            # self.offboard_publisher.publish(offboard_msg)
-
             if not hasattr(self, 'offboard_switched') or self.offboard_switched != self.idx:
                     msg = VehicleCommand()
                     msg.command = VehicleCommand.VEHICLE_CMD_DO_SET_MODE

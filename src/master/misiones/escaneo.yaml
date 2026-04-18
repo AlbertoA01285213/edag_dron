@@ -18,7 +18,7 @@ actions:
   - type: goto
     x: 2.0
     y: -5.3
-    z: -2.5
+    z: -2.0
     yaw: 0.0
 
   - type: hold
@@ -27,7 +27,7 @@ actions:
   - type: searchArUco
 
   - type: scan_2
-    offset: 0.95
+    offset: 1.10 # 0.95
     cajones: 6
     width: 2.6
     side: 1 # left = -1 | right = 1

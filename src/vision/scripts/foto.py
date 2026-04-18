@@ -24,6 +24,7 @@ class Picture(Node):
         # Publicador para el analizador
         self.img_dron_pub = self.create_publisher(Image, 'image_dron', 10)
         self.img_aruco_pub = self.create_publisher(Image, 'image_aruco', 10) 
+        self.img_qr_pub = self.create_publisher(Image, 'image_qr', 10) 
         self.low_res_feed_pub = self.create_publisher(Image, 'low_res_feed', 10)
 
         # Asegurar que la carpeta de destino exista
@@ -58,33 +59,32 @@ class Picture(Node):
                 self.get_logger().error(f"Error en low_res: {e}")
 
     def trigger_callback(self, msg):
-        # Si recibimos un 1 y tenemos una imagen guardada en el buffer
+        try:
+            frame_cv2 = self.bridge.imgmsg_to_cv2(self.latest_frame, desired_encoding='bgr8')
+        
+            filename = f"captura_dron_{self.count}.jpg"
+            save_path = os.path.join(self.save_dir, filename)
+            cv2.imwrite(save_path, frame_cv2)
+            # self.get_logger().info(f"✅ Imagen {self.count} guardada en: {save_path}")
+            
+            self.count += 1
+
+        except Exception as e:
+            self.get_logger().error(f"Error al procesar/guardar imagen: {e}")
+
         if msg.data == 1:
+            # Mandar la foto al qr_detector
             if self.latest_frame is not None:
-                # 1. Publicar la imagen al analizador inmediatamente
-                self.img_dron_pub.publish(self.latest_frame)
-                self.get_logger().info("Foto enviada al analizador")
+                self.img_qr_pub.publish(self.latest_frame)
+                self.get_logger().info("Foto enviada al analizador de qr")
 
-                try:
-                    # 2. Convertir a formato OpenCV para guardar en disco
-                    frame_cv2 = self.bridge.imgmsg_to_cv2(self.latest_frame, desired_encoding='bgr8')
-                    
-                    filename = f"captura_dron_{self.count}.jpg"
-                    save_path = os.path.join(self.save_dir, filename)
-
-                    # 3. Guardar imagen
-                    cv2.imwrite(save_path, frame_cv2)
-                    # self.get_logger().info(f"✅ Imagen {self.count} guardada en: {save_path}")
-                    
-                    self.count += 1
-                except Exception as e:
-                    self.get_logger().error(f"Error al procesar/guardar imagen: {e}")
             else:
                 self.get_logger().warning("Se recibió señal de disparo pero no hay feed de cámara aún.")
 
+
         elif msg.data == 2:
+            # Mandar la foto al aruco detector
             if self.latest_frame is not None:
-                # 1. Publicar la imagen al analizador inmediatamente
                 self.img_aruco_pub.publish(self.latest_frame)
                 self.get_logger().info("Foto enviada al analizador de aruco")
 
