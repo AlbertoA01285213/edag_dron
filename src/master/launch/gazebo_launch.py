@@ -2,19 +2,13 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import ExecuteProcess, LogInfo, TimerAction
 import os
+import sys
+from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
 
     env = os.environ.copy()
     env['PYTHONUNBUFFERED'] = '1'
-
-    gui_dir = os.path.expanduser('~/Documents/edag_dron/src/drone_gui_pkg')
-    gui = TimerAction(period= 6.0, actions=[ExecuteProcess(
-        cmd = ['python3', 'main_gui.py'],
-        cwd = gui_dir,
-        additional_env=env,
-        output = 'screen')])
-
     
     # 1. MicroXRCEAgent
     micro_xrce_agent = ExecuteProcess(
@@ -38,6 +32,13 @@ def generate_launch_description():
         cwd=px4_autopilot_dir,
         additional_env={'GZ_VERSION': 'harmonic', 'PX4_GZ_VIEW_MODEL': ''},
         output='screen')
+    
+    gui_dir = os.path.expanduser('~/Documents/edag_dron/src/drone_gui_pkg')
+    gui = TimerAction(period= 6.0, actions=[ExecuteProcess(
+        cmd = ['python3', 'main_gui.py'],
+        cwd = gui_dir,
+        additional_env=env,
+        output = 'screen')])
     
 
     nodo_camara = TimerAction(period=6.0,actions=[Node(
@@ -80,7 +81,6 @@ def generate_launch_description():
         LogInfo(msg="🚀 Iniciando ecosistema completo del Dron..."),
         micro_xrce_agent,
         px4_sitl,
-        qground_control,
         gui,
         nodo_camara,
         aruco_detector,

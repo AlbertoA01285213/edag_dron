@@ -1,0 +1,148 @@
+#
+# Bunkspeed OBJ Material File
+# http://www.bunkspeed.com
+#
+
+newmtl color
+Kd 0.2980392 0.2980392 0.2980392
+Ks 1 1 1
+pr 0.15
+pm 0
+d 1
+illum 2
+Ns 5.212766
+
+newmtl color-2
+Kd 0.6470588 0.6196079 0.5882353
+Ks 1 1 1
+pr 0.15
+pm 0
+d 1
+illum 2
+Ns 5.212766
+
+newmtl color-3
+Kd 0.6 0.7019608 0.854902
+Ks 1 1 1
+pr 0.15
+pm 0
+d 1
+illum 2
+Ns 5.212766
+
+newmtl color-4
+Kd 0.8705882 0.3254902 0.02745098
+Ks 1 1 1
+pr 0.15
+pm 0
+d 1
+illum 2
+Ns 5.212766
+
+newmtl color-5
+Kd 0.8980392 0.8980392 0.8980392
+Ks 1 1 1
+pr 0.15
+pm 0
+d 1
+illum 2
+Ns 5.212766
+
+newmtl color-6
+Kd 1 1 0
+Ks 1 1 1
+pr 0.15
+pm 0
+d 1
+illum 2
+Ns 5.212766
+
+newmtl color-7
+Kd 0.6941177 0.09803922 0.09803922
+Ks 1 1 1
+pr 0.15
+pm 0
+d 1
+illum 2
+Ns 5.212766
+
+newmtl color-9
+Kd 0.1019608 0.1019608 0.1019608
+Ks 1 1 1
+pr 0.15
+pm 0
+d 1
+illum 2
+Ns 5.212766
+
+newmtl color-10
+Kd 0.3490196 0.3019608 0.2705882
+Ks 1 1 1
+pr 0.15
+pm 0
+d 1
+illum 2
+Ns 5.212766
+
+newmtl color-12
+Kd 0.8431373 0.8156863 0.7529412
+Ks 1 1 1
+pr 0.15
+pm 0
+d 1
+illum 2
+Ns 5.212766
+
+newmtl color-13
+Kd 0.7921569 0.8196079 0.9333333
+Ks 1 1 1
+pr 0.15
+pm 0
+d 1
+illum 2
+Ns 5.212766
+
+newmtl color-14
+Kd 0.007843138 0.2352941 0.8235294
+Ks 1 1 1
+pr 0.15
+pm 0
+d 1
+illum 2
+Ns 5.212766
+
+newmtl green_low_gloss_plastic
+Kd 0.2862745 0.6627451 0.3294118
+Ks 1 1 1
+pr 0.525
+pm 0
+d 1
+illum 2
+Ns 1.357885
+
+newmtl color-15
+Kd 0.9411765 0.9411765 0.9411765
+Ks 1 1 1
+pr 0.15
+pm 0
+d 1
+illum 2
+Ns 5.212766
+
+newmtl blue_glass
+Kd 0.3882353 0.4 0.8588235
+Ks 1 1 1
+pr 0
+pm 0
+d 1
+illum 2
+Ns 100
+
+newmtl color-18
+Kd 0.6745098 0.6745098 0.6745098
+Ks 1 1 1
+pr 0.15
+pm 0
+d 1
+illum 2
+Ns 5.212766
