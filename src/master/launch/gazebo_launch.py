@@ -16,11 +16,21 @@ def generate_launch_description():
         # output='screen'
     )
 
+    qgc_path = os.path.expanduser('~/Downloads/QGroundControl-x86_64.AppImage')
+    qground_control = TimerAction(
+        period=1.0,
+        actions=[ExecuteProcess(
+            cmd=[qgc_path],
+            # output='screen'
+        )]
+    )
+
+
     px4_autopilot_dir = os.path.expanduser('~/Documents/edag_dron/src/PX4-Autopilot')
     px4_sitl = ExecuteProcess(
         cmd=['make', 'px4_sitl', 'gz_x500'],
         cwd=px4_autopilot_dir,
-        additional_env={'GZ_VERSION': 'harmonic'},
+        additional_env={'GZ_VERSION': 'harmonic', 'PX4_GZ_VIEW_MODEL': ''},
         output='screen')
     
     gui_dir = os.path.expanduser('~/Documents/edag_dron/src/drone_gui_pkg')
@@ -48,6 +58,12 @@ def generate_launch_description():
                 executable='aruco_detector',
                 # parameters=[{'use_sim_time': True}],
                 output='screen')])
+    
+    qr_detector = TimerAction(period=7.0, actions=[Node(
+                package='vision',
+                executable='qr_detector',
+                # parameters=[{'use_sim_time': True}],
+                output='screen')])
 
     foto = TimerAction(period=7.0,actions=[Node(
                 package='vision',
@@ -68,6 +84,7 @@ def generate_launch_description():
         gui,
         nodo_camara,
         aruco_detector,
+        qr_detector,
         mission_handler,
         foto,
         pose_traducer
