@@ -1,0 +1,7 @@
+# CondicionesVuelo.srv
+int16 manual
+int16 emergencia
+int16 rtb 
+---
+bool success           # True si se ejecutó correctamente
+string message         # Mensaje de estado

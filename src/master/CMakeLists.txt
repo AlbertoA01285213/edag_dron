@@ -39,6 +39,7 @@ install(PROGRAMS scripts/mission_handler.py
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/ConfigurarVuelo.srv"
+  "srv/CondicionesVuelo.srv"
   DEPENDENCIES action_msgs unique_identifier_msgs geometry_msgs nav_msgs sensor_msgs
 )
 ament_export_dependencies(rosidl_default_runtime)

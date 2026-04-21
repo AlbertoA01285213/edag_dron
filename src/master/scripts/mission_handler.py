@@ -4,7 +4,7 @@ from rclpy.node import Node
 import yaml
 from geometry_msgs.msg import Point, Pose, PoseStamped, PoseArray
 from std_msgs.msg import Bool, String, Float32, Int16
-from master.srv import ConfigurarVuelo
+from master.srv import ConfigurarVuelo, CondicionesVuelo
 from tf_transformations import euler_from_quaternion, quaternion_from_euler
 import time
 import os
@@ -44,11 +44,19 @@ class MissionHandler(Node):
         self.parking_largo = 5.0
         self.parking_ancho = 2.6
 
-        self.srv = self.create_service(ConfigurarVuelo, 'configurar_vuelo', self.configurar_vuelo_callback)
+        self.srv_configurar = self.create_service(ConfigurarVuelo, 'configurar_vuelo', self.configurar_vuelo_callback)
+
+        self.manual = 0
+        self.emergencia = 0
+        self.rtb = 0
+
+        self.srv_condiciones = self.create_service(CondicionesVuelo, 'condiciones_vuelo', self.condiciones_vuelo_callback)
         
         # Variables de nodo
         self.actions = self.mission["actions"]
         self.idx = 0
+        self.barrido_sub_idx = 0
+        self.rtb_sub_idx = 0
         self.last_idx = -1
         self.time_stamp = 0
 
@@ -128,6 +136,15 @@ class MissionHandler(Node):
             response.message = "Misión detenida"
         
         return response
+    
+    def condiciones_vuelo_callback(self, request, response):
+        """Callback del servicio de condiciones"""
+
+        self.manual = request.manual
+        self.emergencia = request.emergencia
+        self.rtb = request.rtb
+        
+        return response
 
     def to_drone_yaw(self, mission_yaw):
         """Convierte el ángulo de tu lógica al que entiende PX4."""
@@ -190,9 +207,149 @@ class MissionHandler(Node):
         offboard_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.offboard_publisher.publish(offboard_msg)
 
+        if self.rtb == 1:
+            if not hasattr(self, 'change_line_iniciado'):
+                self.change_line_iniciado = True
+                self.rtb_sub_idx = 1
+                
+                self.start_x = self.pose_actual[0]
+                self.start_y = self.pose_actual[1]
+                self.start_z = self.pose_actual[2]
+                self.start_yaw = self.pose_actual[3]                
+                return
+            
+            target_x, target_y, target_z, target_yaw = 0.0, 0.0, 0.0, 0.0 
+       
+            if self.rtb_sub_idx == 1:
+                target_x = self.start_x
+                target_y = self.start_y
+                target_z = self.start_z - 2.0
+                target_yaw = self.start_yaw
+                label = "Subiendo por seguridad"
+
+                self.send_setpoint(target_x, target_y, target_z, target_yaw)
+
+                dx = target_x - self.pose_actual[0]
+                dy = target_y - self.pose_actual[1]
+                dz = target_z - self.pose_actual[2]
+                distancia = np.sqrt(dx**2 + dy**2 + dz**2)
+
+                if distancia < 0.3:
+                    self.get_logger().info(f"✅ Paso {self.rtb_sub_idx} completado: {label}")
+                    self.rtb_sub_idx += 1
+
+            elif self.rtb_sub_idx == 2:
+                target_x = 0
+                target_y = 0
+                target_z = self.start_z - 2.0
+                target_yaw = self.start_yaw
+                label = "Regresar al origen"
+
+                self.send_setpoint(target_x, target_y, target_z, target_yaw)
+
+                dx = target_x - self.pose_actual[0]
+                dy = target_y - self.pose_actual[1]
+                dz = target_z - self.pose_actual[2]
+                distancia = np.sqrt(dx**2 + dy**2 + dz**2)
+
+                if distancia < 0.3:
+                    self.get_logger().info(f"✅ Paso {self.rtb_sub_idx} completado: {label}")
+                    self.rtb_sub_idx += 1
+
+            elif self.rtb_sub_idx == 3:
+                if not hasattr(self, 'land_sent'):
+                    msg = VehicleCommand()
+                    msg.command = VehicleCommand.VEHICLE_CMD_NAV_LAND
+                    msg.target_system = 1
+                    msg.target_component = 1
+                    msg.source_system = 1
+                    msg.source_component = 1
+                    msg.from_external = False
+                    msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+                    self.command_publisher.publish(msg)
+
+                    self.land_sent = True
+                    self.ha_empezado_a_bajar = False 
+                    return
+
+                if not self.ha_empezado_a_bajar:
+                    if self.velocidad_actual[2] > 0.2:
+                        self.ha_empezado_a_bajar = True
+                        self.get_logger().info("Descenso iniciado...")
+                    return 
+
+                if self.ha_empezado_a_bajar and abs(self.velocidad_actual[2]) <= 0.05:
+                    self.get_logger().info("Aterrizado con éxito.")
+                    del self.land_sent
+                    del self.ha_empezado_a_bajar
+                    label = "Aterrizado"
+
+            elif self.rtb_sub_idx == 4:
+                msg = VehicleCommand()
+                msg.command = VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM
+                msg.param1 = 0.0
+
+                msg.target_system = 1
+                msg.target_component = 1
+                msg.source_system = 1
+                msg.source_component = 1
+                msg.from_external = True
+
+                msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+
+                self.command_publisher.publish(msg)
+                label = "Aterrizado"
+
+        if self.emergencia == 1:
+            if not hasattr(self, 'land_sent'):
+                msg = VehicleCommand()
+                msg.command = VehicleCommand.VEHICLE_CMD_NAV_LAND
+                msg.target_system = 1
+                msg.target_component = 1
+                msg.source_system = 1
+                msg.source_component = 1
+                msg.from_external = False
+                msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+                self.command_publisher.publish(msg)
+
+                self.land_sent = True
+                self.ha_empezado_a_bajar = False 
+                return
+
+            if not self.ha_empezado_a_bajar:
+                if self.velocidad_actual[2] > 0.2:
+                    self.ha_empezado_a_bajar = True
+                    self.get_logger().info("Descenso iniciado...")
+                return 
+
+            if self.ha_empezado_a_bajar and abs(self.velocidad_actual[2]) <= 0.05:
+                self.get_logger().info("Aterrizado con éxito.")
+                del self.land_sent
+                del self.ha_empezado_a_bajar
+                
+                msg = VehicleCommand()
+                msg.command = VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM
+                msg.param1 = 0.0
+
+                msg.target_system = 1
+                msg.target_component = 1
+                msg.source_system = 1
+                msg.source_component = 1
+                msg.from_external = True
+
+                msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+
+                self.command_publisher.publish(msg)
+                label = "Aterrizado"
+
+
+                        
+                
+
         if not self.mision_iniciada:
             self.send_setpoint(0.0, 0.0, 0.0, 0.0)
             return
+
 
         elif self.mision_iniciada == True:
         
@@ -279,37 +436,6 @@ class MissionHandler(Node):
                 self.command_publisher.publish(msg)
                 self.idx += 1
 
-            # elif action["type"] == "takeoff":
-            #     height = float(action["height"])
-            #     if not hasattr(self, 'takeoff_sent'):
-            #         self.pose_despegue_z = self.pose_actual[2]
-
-            #         msg = VehicleCommand()
-            #         msg.command = VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF
-            #         msg.param7 = float(height)
-            #         msg.target_system = 1
-            #         msg.target_component = 1
-            #         msg.source_system = 1
-            #         msg.source_component = 1
-            #         msg.from_external = True
-            #         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-            #         self.command_publisher.publish(msg)
-
-            #         self.takeoff_sent = True
-            #         self.get_logger().info(f"Comando de despegue enviado. Altura inicial: {self.pose_despegue_z:.2f}")
-            #         return
-
-            #     z_objetivo = self.pose_despegue_z - height
-            #     # error_altura = abs(self.pose_actual[2] - z_objetivo)
-
-            #     error_altura = height - abs(self.pose_actual[2])
-
-            #     # self.get_logger().info(f"Z actual: {self.pose_actual[2]:.2f} | Z objetivo: {z_objetivo:.2f} | Error: {error_altura:.2f} | Pose despegue z: {self.pose_despegue_z:.2f}")
-    
-            #     if error_altura < 0.1:
-            #         self.get_logger().info("Altura alcanzada")
-            #         self.idx += 1
-            #         del self.takeoff_sent
 
             elif action["type"] == "takeoff":
                 height = float(action["height"]) # Ejemplo: 2.0
@@ -372,7 +498,7 @@ class MissionHandler(Node):
                 
                 self.trajectory_pub.publish(setpoint_msg)
 
-                self.get_logger().info(f"Yendo a [{x_obj}, {y_obj}, {z_obj}] | Distancia restante: {distancia:.2f}m")
+                # self.get_logger().info(f"Yendo a [{x_obj}, {y_obj}, {z_obj}] | Distancia restante: {distancia:.2f}m")
 
                 # 3. Condición de llegada
                 if distancia < 0.3:
@@ -402,28 +528,18 @@ class MissionHandler(Node):
                     
                     err = self.current_aruco_error
 
-                    if err.position.x == 999.0:
-                        # El dron no encontro el Aruco, empezara a rotar hasta encontrarlo
-                        self.get_logger().error("Aruco no encontrado. Rotando 45 grados")
+                    if err.position.x == 999.0 and err.position.y == 999.0 and err.position.z == 999.0:
+                        duration = 2.0
+                        if not hasattr(self, "hold_start"):
+                            self.hold_start = time.perf_counter()
 
-                        target_x = self.pose_actual[0]
-                        target_y = self.pose_actual[1]
-                        target_z = self.pose_actual[2]
+                            if time.perf_counter() - self.hold_start >= duration:
+                                del self.hold_start
 
-                        target_yaw = np.deg2rad(self.pose_actual[3]) - 0.785
+                                self.posicionado = False
+                                return
 
-                        setpoint_msg = TrajectorySetpoint()
-                        setpoint_msg.position = [float(self.pose_actual[0]), float(self.pose_actual[1]), float(self.pose_actual[2])]
-                        setpoint_msg.yaw = float(target_yaw) # El dron rota 45 grados
-                        setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                        self.trajectory_pub.publish(setpoint_msg)
-
-                        self.target_vuelo = [target_x, target_y, target_z, target_yaw]
-
-                        self.posicionado = False
-                        self.hold_start = time.perf_counter()
-
-                    elif abs(err.position.x) < 0.07 and abs(err.position.y) < 0.05:
+                    elif abs(err.position.x) < 0.07 and abs(err.position.y) < 0.05 and abs(err.position.z) < 0.1:
                         self.get_logger().error("🎯 Dron alineado, continuando")
                         # LIMPIEZA SEGURA
                         if hasattr(self, "alineado"): del self.alineado
@@ -434,7 +550,7 @@ class MissionHandler(Node):
                     else:
                         # En esta condicion encontro el ArUco y se va a posicionar para tener el ArUco en el centro
                         self.get_logger().info("ArUco encontrado, alineando")
-                        self.get_logger().info(f"Error de referencia de arucos. X: {err.position.x:.2f}, Y: {err.position.y:.2f}, Z: {err.position.z:.2f},")
+                        # self.get_logger().info(f"Error de referencia de arucos. X: {err.position.x:.2f}, Y: {err.position.y:.2f}, Z: {err.position.z:.2f},")
                         
                         # Calcula lo que tendra que moverse
                         fwd = err.position.z * 0.7
@@ -443,17 +559,19 @@ class MissionHandler(Node):
 
                         tx, ty, tz, tyaw = self.get_global_coordinates(fwd, rgt, dwn)
 
-                        self.get_logger().info(f"Waypoint. X: {tx:.2f}, Y: {ty:.2f}, Z: {tz:.2f},")
-                        self.get_logger().info(f"Posicion actual. X: {self.pose_actual[0]:.2f}, Y: {self.pose_actual[1]:.2f}, Z: {self.pose_actual[2]:.2f},")
+                        # self.get_logger().info(f"Waypoint. X: {tx:.2f}, Y: {ty:.2f}, Z: {tz:.2f},")
+                        # self.get_logger().info(f"Posicion actual. X: {self.pose_actual[0]:.2f}, Y: {self.pose_actual[1]:.2f}, Z: {self.pose_actual[2]:.2f},")
                         
                         target_yaw = self.normalize_angle(tyaw)
 
-                        self.get_logger().info(f"YAW ACTUAL: {self.pose_actual[3]:.2f} | YAW ENVIADO: {target_yaw:.2f}")
+                        # self.get_logger().info(f"YAW ACTUAL: {self.pose_actual[3]:.2f} | YAW ENVIADO: {target_yaw:.2f}")
 
                         self.send_setpoint(tx, ty, tz, tyaw)
 
                         self.posicionado = False
                         self.hold_start = time.perf_counter()
+
+
 
                 if not self.posicionado:
                     distancia = 999.0
@@ -478,58 +596,89 @@ class MissionHandler(Node):
                 width = float(action["width"])
                 side = int(action["side"])
 
-                if not hasattr(self, 'scan_iniciado'):
-                    self.scan_iniciado = True
-                    self.current_cajon = 0
-                    self.scan_origin_x = self.pose_actual[0]
-                    self.scan_origin_y = self.pose_actual[1]
-                    self.scan_origin_z = self.pose_actual[2]
-                    self.scan_origin_yaw = self.pose_actual[3]
-                
-                    self.theta = self.pose_actual[3]
-
-                    self.get_logger().info(f"🚀 Iniciando barrido para {cajones} cajones.")
-                    return 
-                
-                if side == 1:
-                    y_obj = self.scan_origin_y - cajones * width - offset
-
-                elif side == -1:
-                    y_obj = self.scan_origin_y + cajones * width + offset
-
-                x_obj = self.scan_origin_x
-                z_obj = self.scan_origin_z
-                yaw_obj = self.scan_origin_yaw
-
-                setpoint_msg = TrajectorySetpoint()
-                setpoint_msg.position = [float(x_obj), float(y_obj), float(z_obj)]
-                setpoint_msg.yaw = yaw_obj
-                setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                self.trajectory_pub.publish(setpoint_msg)
-
-                distancia_recorrida = abs(self.pose_actual[1] - self.scan_origin_y)
-                punto_proxima_foto = offset + (self.current_cajon * width)
-
-                if distancia_recorrida >= punto_proxima_foto and self.current_cajon < cajones:
-                    self.get_logger().info(f"📸 Tomando foto cajón {self.current_cajon + 1} a {distancia_recorrida:.2f}m")
-
-                    self.tomar_foto_pub.publish(Int16(data=1))
-                    self.tomar_foto_pub.publish(Int16(data=0))
-                    # Nota: El nodo de la cámara debería apagar el flag solo tras guardar
+                if self.barrido_sub_idx == 0:
+                    if not hasattr(self, 'scan_iniciado'):
+                        self.scan_iniciado = True
+                        self.current_cajon = 0
+                        self.scan_origin_x = self.pose_actual[0]
+                        self.scan_origin_y = self.pose_actual[1]
+                        self.scan_origin_z = self.pose_actual[2]
+                        self.scan_origin_yaw = self.pose_actual[3]
                     
-                    self.current_cajon += 1
+                        self.theta = self.pose_actual[3]
 
-                
-                dx = x_obj - self.pose_actual[0]
-                dy = y_obj - self.pose_actual[1]
-                dz = z_obj - self.pose_actual[2]
-                
-                distancia = np.sqrt(dx**2 + dy**2 + dz**2)
+                        self.get_logger().info(f"🚀 Iniciando barrido para {cajones} cajones.")
+                        return 
+                    
+                    if side == 1:
+                        y_obj = self.scan_origin_y - cajones * width - offset
 
-                if distancia < 0.3:
-                    self.get_logger().info("¡Punto de destino alcanzado!")
-                    del self.scan_iniciado
-                    self.idx += 1
+                    elif side == -1:
+                        y_obj = self.scan_origin_y + cajones * width + offset
+
+                    x_obj = self.scan_origin_x
+                    z_obj = self.scan_origin_z
+                    yaw_obj = self.scan_origin_yaw
+
+                    setpoint_msg = TrajectorySetpoint()
+                    setpoint_msg.position = [float(x_obj), float(y_obj), float(z_obj)]
+                    setpoint_msg.yaw = yaw_obj
+                    setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+                    self.trajectory_pub.publish(setpoint_msg)
+
+                    distancia_recorrida = abs(self.pose_actual[1] - self.scan_origin_y)
+                    punto_proxima_foto = offset + (self.current_cajon * width)
+
+                    if distancia_recorrida >= punto_proxima_foto and self.current_cajon < cajones:
+                        self.get_logger().info(f"📸 Tomando foto cajón {self.current_cajon + 1} a {distancia_recorrida:.2f}m")
+
+                        self.tomar_foto_pub.publish(Int16(data=1))
+                        self.tomar_foto_pub.publish(Int16(data=0))
+                        # Nota: El nodo de la cámara debería apagar el flag solo tras guardar
+                        
+                        self.current_cajon += 1
+
+                    
+                    dx = x_obj - self.pose_actual[0]
+                    dy = y_obj - self.pose_actual[1]
+                    dz = z_obj - self.pose_actual[2]
+                        
+                    distancia = np.sqrt(dx**2 + dy**2 + dz**2)
+
+                    if distancia < 0.3:
+                        self.get_logger().info("¡Punto de destino alcanzado!")
+                        self.barrido_sub_idx = 1
+
+                else:
+                    if not hasattr(self, 'retroceso'):
+                        self.retroceso = True
+                        self.current_cajon = 0
+                        self.scan_origin_x = float(self.pose_actual[0] - 1.0)
+                        self.scan_origin_y = float(self.pose_actual[1])
+                        self.scan_origin_z = float(self.pose_actual[2])
+                    
+                        self.get_logger().info(f"Iniciando retroceso")
+                        return 
+                    
+                    dx = float(self.scan_origin_x - self.pose_actual[0])
+                    dy = float(self.scan_origin_y - self.pose_actual[1])
+                    dz = float(self.scan_origin_z - self.pose_actual[2])
+                    distancia = np.sqrt(dx**2 + dy**2 + dz**2)
+
+                    setpoint_msg = TrajectorySetpoint()
+                    setpoint_msg.position = [float(self.scan_origin_x), float(self.scan_origin_y), float(self.scan_origin_z)]
+                    setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+                
+                    self.trajectory_pub.publish(setpoint_msg)
+
+                    # self.get_logger().info(f"Yendo a [{dx}, {dy}, {dz}] | Distancia restante: {distancia:.2f}m")
+
+
+                    if distancia < 0.3:
+                        self.get_logger().info("Barrido completado")
+                        del self.scan_iniciado
+                        self.idx += 1
+                        self.barrido_sub_idx = 0
 
 
             elif action["type"] == "changeLine":

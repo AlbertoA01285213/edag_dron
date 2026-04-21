@@ -29,7 +29,7 @@ class ArucoDetector(Node):
         self.max_intentos = 2
 
         # Parámetro de diseño: ¿Cuánto debe medir el lado del ArUco en pixeles?
-        self.target_pixel_size = 300.0 
+        self.target_pixel_size = 250.0 
         self.img_counter = 0
 
         self.save_dir = os.path.join(os.path.expanduser('~'), 'Desktop', 'Fotos_dron', 'foto_aruco')
@@ -61,18 +61,27 @@ class ArucoDetector(Node):
                 self.foto_buffer = [] # Limpiamos buffer
 
             else:
-                self.foto_buffer.append(False)
+                # self.foto_buffer.append(False)
                 self.get_logger().warn(f"Intento {len(self.foto_buffer)} fallido.")
+
+                error_msg = Pose()
+                error_msg.position.x = 999.0
+                error_msg.position.y = 999.0
+                error_msg.position.z = 999.0
+                self.error_pub.publish(error_msg)
+
+                # Solo si fallamos N veces, mandamos el 999
+                # if len(self.foto_buffer) >= self.max_intentos:
+                #     error_msg = Pose()
+                #     error_msg.position.x = 999.0
+                #     self.error_pub.publish(error_msg)
+                #     self.get_logger().error("ArUco no detectado tras múltiples intentos.")
+                #     self.foto_buffer = []
+
                 file_path = os.path.join(self.save_dir, f'error_aruco_debug_{self.img_counter}.jpg')
                 cv2.imwrite(file_path, debug_img)
 
-                # Solo si fallamos N veces, mandamos el 999
-                if len(self.foto_buffer) >= self.max_intentos:
-                    error_msg = Pose()
-                    error_msg.position.x = 999.0
-                    self.error_pub.publish(error_msg)
-                    self.get_logger().error("ArUco no detectado tras múltiples intentos.")
-                    self.foto_buffer = []
+                self.img_counter += 1
 
         except Exception as e:
             self.get_logger().error(f"Error: {e}")

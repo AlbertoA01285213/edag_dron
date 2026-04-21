@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
+import os
 import sys
 import cv2
+import sqlite3
 import numpy as np
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image, NavSatFix  # o el tipo que uses para odometría
-from PySide6.QtGui import QPixmap, QImage
-from PySide6.QtCore import Signal, QThread, Qt, Slot
-from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, 
-                             QVBoxLayout, QHBoxLayout, QWidget, QStackedWidget, 
-                             QLabel, QFrame, QGridLayout, QSpinBox, QDoubleSpinBox)
+from PySide6.QtGui import QPixmap, QImage, QPainter, QColor, QPen, QCursor
+from PySide6.QtCore import Signal, QThread, Qt, Slot, QPoint
+from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QToolTip,
+                             QVBoxLayout, QHBoxLayout, QWidget, QStackedWidget, QMessageBox,
+                             QLabel, QFrame, QGridLayout, QSpinBox, QDoubleSpinBox, QWidget)
 import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
@@ -18,10 +20,11 @@ from geometry_msgs.msg import Pose
 from example_interfaces.srv import SetBool
 
 try:
-    from master.srv import ConfigurarVuelo
+    from master.srv import ConfigurarVuelo, CondicionesVuelo
 except ImportError:
     print("No se pudo importar ConfigurarVuelo")
     ConfigurarVuelo = None
+    CondicionesVuelo = None
 
 
 class RosWorker(QThread):
@@ -35,7 +38,8 @@ class RosWorker(QThread):
         self.node = None
         self.bridge = CvBridge()
         self.executor = None
-        self.config_client = None
+        self.config_client_ConfigurarVuelo = None
+        self.config_client_CondicionesVuelo = None
 
     def run(self):
         # Inicializar ROS 2 en este hilo
@@ -45,9 +49,18 @@ class RosWorker(QThread):
         # qos_profile = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=1)
         
         if ConfigurarVuelo:
-            self.config_client = self.node.create_client(
+            self.config_client_ConfigurarVuelo = self.node.create_client(
                 ConfigurarVuelo,
                 'configurar_vuelo'
+            )
+            self.status_signal.emit("Cliente de configuracion creado")
+        else:
+            self.status_signal.emit("Servicio personalizado no disponible")
+
+        if CondicionesVuelo:
+            self.config_client_CondicionesVuelo = self.node.create_client(
+                CondicionesVuelo,
+                'condiciones_vuelo'
             )
             self.status_signal.emit("Cliente de configuracion creado")
         else:
@@ -105,10 +118,10 @@ class RosWorker(QThread):
         self.client.call_async(req)
 
     def configurar_vuelo(self, iniciar, altura, velocidad, largo, ancho):
-        if not self.config_client:
+        if not self.config_client_ConfigurarVuelo:
             self.status_signal.emit("Servicio no disponible")
             return False
-        if not self.config_client.wait_for_service(timeout_sec=1.0):
+        if not self.config_client_ConfigurarVuelo.wait_for_service(timeout_sec=1.0):
             self.status_signal.emit("Servicio de configuracion no encontrado")
             return False
         
@@ -121,10 +134,117 @@ class RosWorker(QThread):
         
         self.status_signal.emit("Enviando config")
 
-        future = self.config_client.call_async(req)
+        future = self.config_client_ConfigurarVuelo.call_async(req)
+        return True
+    
+    def condiciones_vuelo(self, manual, emergencia, rtb):
+        if not self.config_client_CondicionesVuelo:
+            self.status_signal.emit("Servicio no disponible")
+            return False
+        if not self.config_client_CondicionesVuelo.wait_for_service(timeout_sec=1.0):
+            self.status_signal.emit("Servicio de configuracion no encontrado")
+            return False
+        
+        req = CondicionesVuelo.Request()
+        req.manual = manual
+        req.emergencia = emergencia
+        req.rtb = rtb
+        
+        self.status_signal.emit("Enviando config")
+
+        future = self.config_client_CondicionesVuelo.call_async(req)
         return True
 
-# --- INTERFAZ PRINCIPAL ---
+class ParkingMapWidget(QLabel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.detecciones = []
+        # Configuración del mapa (AJUSTA ESTO SEGÚN TU MUNDO DE GAZEBO)
+        self.world_bounds = {
+            'x_min': -1.0, 'x_max': 20.0,
+            'y_min': -42.0, 'y_max': 14.0
+        }
+        self.setMouseTracking(True)
+
+    def mouseMoveEvent(self, event):
+        """Detecta qué carro hay bajo el mouse y muestra un ToolTip"""
+        mouse_pos = event.pos()
+        found = False
+
+        for det in self.detecciones:
+            px, py = self.world_to_pixel(det[1], det[2])
+            target_pos = QPoint(px, py)
+            
+            # Calculamos la distancia entre el mouse y el punto del carro
+            dist = (target_pos - mouse_pos).manhattanLength()
+            
+            if dist < 12:  # Radio de proximidad (ajustable)
+                # Formateamos el texto con HTML para que se vea elegante
+                info_text = (
+                    f"<b>🚗 Cajón: {det[0]}</b><br>"
+                    f"📍 Posición: ({det[1]:.2f}, {det[2]:.2f})<br>"
+                    f"📝 Info: {det[3]}"
+                )
+                
+                # Mostramos el ToolTip en la posición global del cursor
+                QToolTip.showText(QCursor.pos(), info_text, self)
+                found = True
+                # Cambiamos el cursor a una mano para indicar interactividad
+                self.setCursor(Qt.PointingHandCursor)
+                break
+        
+        if not found:
+            # Si no hay nada cerca, ocultamos el ToolTip y regresamos el cursor
+            QToolTip.hideText()
+            self.setCursor(Qt.ArrowCursor)
+
+    def load_data(self):
+        """Lee la base de datos y guarda las coordenadas"""
+        db_path = os.path.expanduser('~/Documents/edag_dron/src/master/config/edag_db.db')
+        if not os.path.exists(db_path): return
+
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT cajon, x, y, info FROM carros")
+        self.detecciones = cursor.fetchall()
+        conn.close()
+        self.update() # Llama a paintEvent
+
+    def world_to_pixel(self, x_world, y_world):
+        """Convierte metros a píxeles basándose en el tamaño actual del widget"""
+        w, h = self.width(), self.height()
+        
+        # Proporción
+        u = (y_world - self.world_bounds['y_min']) / (self.world_bounds['y_max'] - self.world_bounds['y_min'])
+        v = (self.world_bounds['x_max'] - x_world) / (self.world_bounds['x_max'] - self.world_bounds['x_min'])
+        
+        return int(u * w), int(v * h)
+
+    def paintEvent(self, event):
+        super().paintEvent(event) # Dibuja la imagen de fondo (el mapa)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        pen = QPen(QColor(255, 0, 0), 10)
+        painter.setPen(pen)
+
+        for det in self.detecciones:
+            px, py = self.world_to_pixel(det[1], det[2])
+            painter.drawPoint(px, py)
+
+    def mousePressEvent(self, event):
+        """Detecta clics cerca de los puntos registrados"""
+        click_pos = event.pos()
+        for det in self.detecciones:
+            px, py = self.world_to_pixel(det[1], det[2])
+            dist = (QPoint(px, py) - click_pos).manhattanLength()
+            
+            if dist < 15: # Radio de clic de 15 píxeles
+                QMessageBox.information(self, f"Info Cajón {det[0]}", 
+                                      f"Coordenadas: ({det[1]:.2f}, {det[2]:.2f})\nDatos QR: {det[3]}")
+                break
+
+
 class DroneDashboard(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -233,13 +353,29 @@ class DroneDashboard(QMainWindow):
         self.btn_kill.clicked.connect(self.emergency_stop)
         f_layout.addWidget(self.btn_kill)
 
+        self.btn_rtb = QPushButton("RTB")
+        self.btn_rtb.setStyleSheet("background-color: red; font-weight: bold; height: 50px;")
+        self.btn_rtb.clicked.connect(self.rtb)
+        f_layout.addWidget(self.btn_rtb)
+
         self.page_flight.setLayout(f_layout)
         self.pages.addWidget(self.page_flight)
 
         # Página 3: Resultados ====================================================
         self.page_res = QWidget()
-        self.page_res.setLayout(QVBoxLayout())
-        self.page_res.layout().addWidget(QLabel("Historial de ArUcos detectados"))
+        res_layout = QVBoxLayout()
+        self.btn_refresh = QPushButton("Actualizar Resultados")
+        self.btn_refresh.clicked.connect(self.refresh_results)
+        res_layout.addWidget(self.btn_refresh)
+
+        self.parking_map = ParkingMapWidget()
+        # Aquí pon una captura de pantalla de Gazebo desde arriba
+        map_img_path = os.path.expanduser('~/Documents/edag_dron/src/master/config/mapa_parking.png')
+        self.parking_map.setPixmap(QPixmap(map_img_path))
+        self.parking_map.setScaledContents(True)
+        
+        res_layout.addWidget(self.parking_map)
+        self.page_res.setLayout(res_layout)
         self.pages.addWidget(self.page_res)
 
     def update_camera_feed(self, pixmap):
@@ -259,16 +395,46 @@ class DroneDashboard(QMainWindow):
         self.status_label.setText(f"● {text}")
         self.status_label.setStyleSheet("color: green;")
 
+    def refresh_results(self):
+        self.parking_map.load_data()
+
     def emergency_stop(self):
         """Maneja el botón de parada de emergencia."""
         print("🚨 EMERGENCY STOP ACTIVADO")
         if self.status_label:
             self.status_label.setText("● EMERGENCIA ACTIVADA")
             self.status_label.setStyleSheet("color: red; font-weight: bold; padding: 5px;")
-        
-        # Aquí puedes agregar lógica para publicar un mensaje de stop
-        # Por ejemplo, si tienes un publisher en el worker:
-        # self.ros_worker.publish_emergency_stop()
+
+            manual = 0
+            emergencia = 1
+            rtb = 0
+
+            condiciones_vuelo = self.ros_worker.condiciones_vuelo(manual, emergencia, rtb)
+
+            if condiciones_vuelo:
+                self.pages.setCurrentIndex(1)
+                print(f"Emergencia activado")
+            else:
+                print("Fallo para emergencia")
+
+    def rtb(self):
+        print("RTB ACTIVADO")
+        if self.status_label:
+            self.status_label.setText("RTB ACTIVADA")
+            self.status_label.setStyleSheet("color: red; font-weight: bold; padding: 5px;")
+
+            manual = 0
+            emergencia = 0
+            rtb = 1
+
+            condiciones_vuelo = self.ros_worker.condiciones_vuelo(manual, emergencia, rtb)
+
+        if condiciones_vuelo:
+            self.pages.setCurrentIndex(1)
+            print(f"Regreso a base activado")
+        else:
+            print("Fallo para regresar a base")
+
 
     def iniciar_vuelo(self):
         altura = self.despegue_altura.value()
