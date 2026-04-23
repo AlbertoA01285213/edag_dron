@@ -78,9 +78,6 @@ actions:
   - type: hold
     duration: 5
 
-  - type: hold
-    duration: 2
-
   - type: searchArUco
 
   - type: scan_2

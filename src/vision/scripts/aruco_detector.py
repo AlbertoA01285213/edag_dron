@@ -29,7 +29,7 @@ class ArucoDetector(Node):
         self.max_intentos = 2
 
         # Parámetro de diseño: ¿Cuánto debe medir el lado del ArUco en pixeles?
-        self.target_pixel_size = 250.0 
+        self.target_pixel_size = 300.0 
         self.img_counter = 0
 
         self.save_dir = os.path.join(os.path.expanduser('~'), 'Desktop', 'Fotos_dron', 'foto_aruco')

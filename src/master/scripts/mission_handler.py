@@ -649,26 +649,39 @@ class MissionHandler(Node):
                         self.get_logger().info("¡Punto de destino alcanzado!")
                         self.barrido_sub_idx = 1
 
-                else:
+                elif self.barrido_sub_idx == 1:
                     if not hasattr(self, 'retroceso'):
                         self.retroceso = True
                         self.current_cajon = 0
-                        self.scan_origin_x = float(self.pose_actual[0] - 1.0)
-                        self.scan_origin_y = float(self.pose_actual[1])
-                        self.scan_origin_z = float(self.pose_actual[2])
+
+                        fwd = -1.0
+                        rgt = 0
+                        dwn = 0
+                        tx, ty, tz, tyaw = self.get_global_coordinates(fwd, rgt, dwn)
+
+                        self.scan_origin_x = float(tx)
+                        self.scan_origin_y = float(ty)
+                        self.scan_origin_z = float(tz)
+                        self.scan_origin_yaw = float(tyaw)
+
+                        # self.scan_origin_x = float(self.pose_actual[0] - 1.0)
+                        # self.scan_origin_y = float(self.pose_actual[1])
+                        # self.scan_origin_z = float(self.pose_actual[2])
+                        # self.scan_origin_yaw = float(self.pose_actual[3])
                     
                         self.get_logger().info(f"Iniciando retroceso")
                         return 
-                    
+                                       
                     dx = float(self.scan_origin_x - self.pose_actual[0])
                     dy = float(self.scan_origin_y - self.pose_actual[1])
                     dz = float(self.scan_origin_z - self.pose_actual[2])
                     distancia = np.sqrt(dx**2 + dy**2 + dz**2)
 
                     setpoint_msg = TrajectorySetpoint()
-                    setpoint_msg.position = [float(self.scan_origin_x), float(self.scan_origin_y), float(self.scan_origin_z)]
+                    setpoint_msg.position = [self.scan_origin_x, self.scan_origin_y, self.scan_origin_z]
+                    setpoint_msg.yaw = self.scan_origin_yaw
                     setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                
+    
                     self.trajectory_pub.publish(setpoint_msg)
 
                     # self.get_logger().info(f"Yendo a [{dx}, {dy}, {dz}] | Distancia restante: {distancia:.2f}m")
@@ -676,18 +689,23 @@ class MissionHandler(Node):
 
                     if distancia < 0.3:
                         self.get_logger().info("Barrido completado")
-                        del self.scan_iniciado
+
+                        if hasattr(self, 'scan_iniciado'): del self.scan_iniciado
+                        if hasattr(self, 'retroceso'): del self.retroceso
+                        
                         self.idx += 1
                         self.barrido_sub_idx = 0
+                        return
 
 
             elif action["type"] == "changeLine":
-                variant = int(action["variant"])
+                self.variant = int(action["variant"])
                 offset = float(action["offset"])
                 length = float(action["length"])
                 rotation = float(action["rotate"])
 
                 if not hasattr(self, 'change_line_iniciado'):
+                    self.get_logger().info(f"Iniciando cambio de linea con variante: {self.variant}")
                     self.change_line_iniciado = True
                     self.sub_step = 1
                     
@@ -699,7 +717,7 @@ class MissionHandler(Node):
                 
                 target_x, target_y, target_z, target_yaw = 0.0, 0.0, 0.0, 0.0 
 
-                if variant == 1:  
+                if self.variant == 1:  
                     self.sub_idx = 3         
                     if self.sub_step == 1:
                         target_x = self.start_x
@@ -721,34 +739,47 @@ class MissionHandler(Node):
                         target_z = self.start_z
                         target_yaw = self.start_yaw + 3.14
                         label = "Bajando y rotando a nueva fila"
+
+                    self.send_setpoint(target_x, target_y, target_z, target_yaw)
+
+                    dx = target_x - self.pose_actual[0]
+                    dy = target_y - self.pose_actual[1]
+                    dz = target_z - self.pose_actual[2]
+                    distancia = np.sqrt(dx**2 + dy**2 + dz**2)
+
+                    if distancia < 0.3:
+                        self.get_logger().info(f"✅ Paso {self.sub_step} completado: {label}")
+                        self.sub_step += 1
+                        
+                        # Si terminamos los 3 pasos, cerramos la acción
+                        if self.sub_step > self.sub_idx:
+                            self.get_logger().info("🏁 Cambio de fila finalizado.")
+                            del self.change_line_iniciado
+                            del self.sub_step
+                            self.idx += 1
                 
-                elif variant == 2:
-                    self.sub_idx = 1 
-                    if self.sub_step == 1:
-                        target_x = self.start_x
-                        target_y = self.start_y
-                        target_z = self.start_z
-                        target_yaw = self.start_yaw - 3.14
-                        label = "Subiendo por seguridad"
+                elif self.variant == 2:
+                    target_x = self.start_x
+                    target_y = self.start_y
+                    target_z = self.start_z
+                    target_yaw = self.start_yaw - 3.14
 
+                    self.send_setpoint(target_x, target_y, target_z, target_yaw)
 
-                self.send_setpoint(target_x, target_y, target_z, target_yaw)
+                    self.get_logger().info("Rotando")
 
-                dx = target_x - self.pose_actual[0]
-                dy = target_y - self.pose_actual[1]
-                dz = target_z - self.pose_actual[2]
-                distancia = np.sqrt(dx**2 + dy**2 + dz**2)
+                    if not hasattr(self, "hold_start"):
+                        self.hold_start = time.perf_counter()
 
-                if distancia < 0.3:
-                    self.get_logger().info(f"✅ Paso {self.sub_step} completado: {label}")
-                    self.sub_step += 1
-                    
-                    # Si terminamos los 3 pasos, cerramos la acción
-                    if self.sub_step > self.sub_idx:
-                        self.get_logger().info("🏁 Cambio de fila finalizado.")
-                        del self.change_line_iniciado
-                        del self.sub_step
+                    if time.perf_counter() - self.hold_start >= 2:
+                        del self.hold_start
+                        self.get_logger().info("Cambio de linea rotacion terminado")
+
                         self.idx += 1
+
+
+
+
 
 
             elif action["type"] == "scan":

@@ -16,6 +16,7 @@ from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from sensor_msgs.msg import Image
+from std_msgs.msg import String
 from geometry_msgs.msg import Pose
 from example_interfaces.srv import SetBool
 
@@ -31,6 +32,8 @@ class RosWorker(QThread):
     # Señales para enviar datos a la GUI
     image_signal = Signal(QPixmap)          # Imagen lista para mostrar
     odom_signal = Signal(str)               # Texto con posición (o coordenadas separadas)
+    wp_signal = Signal(str)
+    accion_signal = Signal(str)
     status_signal = Signal(str)             # Para logs/estado
 
     def __init__(self):
@@ -71,6 +74,8 @@ class RosWorker(QThread):
 
         self.node.create_subscription(Image, 'low_res_feed', self.camera_callback, 10)
         self.node.create_subscription(Pose, 'pose_dron', self.odom_callback, 10)
+        self.node.create_subscription(String, 'accion_odom', self.accion_callback, 10)
+        self.node.create_subscription(Pose, 'waypoint_odom', self.wp_callback, 10)
         
         self.status_signal.emit("Nodo ROS iniciado. Esperando datos...")
         
@@ -103,6 +108,20 @@ class RosWorker(QThread):
 
         text = f"X: {x:.2f}, Y: {y:.2f}, Z: {z:.2f}m | Yaw: {yaw:.2f}"
         self.odom_signal.emit(text)
+
+    def wp_callback(self, msg):
+        x, y, z = msg.position.x, msg.position.y, msg.position.z
+        q = msg.orientation
+        siny_cosp = 2 * (q.w * q.z + q.x * q.y)
+        cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
+        yaw = np.arctan2(siny_cosp, cosy_cosp)
+
+        text = f"X: {x:.2f}, Y: {y:.2f}, Z: {z:.2f}m | Yaw: {yaw:.2f}"
+        self.wp_signal.emit(text)
+
+    def accion_callback(self, msg):
+        accion = msg.data
+        self.accion_signal.emit(accion)
 
     def llamar_servicio_vuelo(self, estado, altura, ancho, largo):
         """Método que será llamado desde la GUI"""
@@ -334,15 +353,33 @@ class DroneDashboard(QMainWindow):
         # Página 2: Vuelo (La más importante) =====================================
         self.page_flight = QWidget()
         f_layout = QVBoxLayout()
-        self.odom_label = QLabel("Esperando telemetría...")
-        self.odom_label.setStyleSheet("font-size: 20px; color: green;")
-        f_layout.addWidget(self.odom_label)
-
+    
         self.camera_label = QLabel()
         self.camera_label.setMinimumSize(640, 360)
         self.camera_label.setStyleSheet("border: 2px solid gray;")
         self.camera_label.setAlignment(Qt.AlignCenter)
         f_layout.addWidget(self.camera_label)
+
+        self.odom_title = QLabel("Posicion:")
+        self.odom_title.setStyleSheet("font-size: 20px; color: green;")
+        f_layout.addWidget(self.odom_title)
+        self.odom_label = QLabel("Esperando telemetría...")
+        self.odom_label.setStyleSheet("font-size: 20px; color: green;")
+        f_layout.addWidget(self.odom_label)
+
+        self.wp_title = QLabel("Waypoint: ")
+        self.wp_title.setStyleSheet("font-size: 20px; color: green;")
+        f_layout.addWidget(self.wp_title)
+        self.wp_label = QLabel("Esperando telemetría...")
+        self.wp_label.setStyleSheet("font-size: 20px; color: green;")
+        f_layout.addWidget(self.wp_label)
+
+        self.accion_title = QLabel("Accion: ")
+        self.accion_title.setStyleSheet("font-size: 20px; color: green;")
+        f_layout.addWidget(self.accion_title)
+        self.accion_label = QLabel("Esperando telemetría...")
+        self.accion_label.setStyleSheet("font-size: 20px; color: green;")
+        f_layout.addWidget(self.accion_label)
 
         self.status_label = QLabel("● ROS no conectado")
         self.status_label.setStyleSheet("color: orange;")
@@ -390,6 +427,12 @@ class DroneDashboard(QMainWindow):
 
     def update_odometry(self, text):
         self.odom_label.setText(text)
+
+    def update_wp(self, text):
+        self.wp_label.setText(text)
+
+    def update_accion(self, text):
+        self.accion_label.setText(text)
 
     def update_status(self, text):
         self.status_label.setText(f"● {text}")
@@ -465,6 +508,8 @@ class DroneDashboard(QMainWindow):
         # Conectar señales del worker a slots de la GUI
         self.ros_worker.image_signal.connect(self.update_camera_feed)
         self.ros_worker.odom_signal.connect(self.update_odometry)
+        self.ros_worker.wp_signal.connect(self.update_wp)
+        self.ros_worker.accion_signal.connect(self.update_accion)
         self.ros_worker.status_signal.connect(self.update_status)
 
 if __name__ == "__main__":
