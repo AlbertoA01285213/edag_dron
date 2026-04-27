@@ -4,6 +4,7 @@ from rclpy.node import Node
 import cv2
 import os
 import numpy as np
+from std_msgs.msg import Int16
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Pose # Cambiamos a Pose para tener más campos
 from cv_bridge import CvBridge
@@ -14,6 +15,7 @@ class ArucoDetector(Node):
         self.bridge = CvBridge()
         self.create_subscription(Image, 'image_aruco', self.image_callback, 10)
         self.error_pub = self.create_publisher(Pose, 'aruco_error', 10) # Ahora publicamos Pose
+        self.id_pub = self.create_publisher(Int16, 'aruco_id', 10) 
 
         # Configuración ArUco
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
@@ -105,6 +107,10 @@ class ArucoDetector(Node):
         error_msg.position.z = float((self.target_pixel_size - current_size) / self.target_pixel_size)
 
         self.error_pub.publish(error_msg)
+
+        id_msg = Int16()
+        id_msg.data = int(ids[0][0])
+        self.id_pub.publish(id_msg)
 
 
         cv2.aruco.drawDetectedMarkers(debug_img, corners, ids)

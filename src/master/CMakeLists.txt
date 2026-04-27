@@ -37,6 +37,11 @@ install(PROGRAMS scripts/mission_handler.py
   RENAME mission_handler
 )
 
+install(PROGRAMS scripts/mission_handler_2.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME mission_handler_2
+)
+
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/ConfigurarVuelo.srv"
   "srv/CondicionesVuelo.srv"

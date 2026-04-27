@@ -111,17 +111,18 @@ class RosWorker(QThread):
 
     def wp_callback(self, msg):
         x, y, z = msg.position.x, msg.position.y, msg.position.z
-        q = msg.orientation
-        siny_cosp = 2 * (q.w * q.z + q.x * q.y)
-        cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
-        yaw = np.arctan2(siny_cosp, cosy_cosp)
+        q = msg.orientation.z
+        # siny_cosp = 2 * (q.w * q.z + q.x * q.y)
+        # cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
+        # yaw = np.arctan2(siny_cosp, cosy_cosp)
 
-        text = f"X: {x:.2f}, Y: {y:.2f}, Z: {z:.2f}m | Yaw: {yaw:.2f}"
+        text = f"X: {x:.2f}, Y: {y:.2f}, Z: {z:.2f}m | Yaw: {q:.2f}"
         self.wp_signal.emit(text)
 
     def accion_callback(self, msg):
         accion = msg.data
         self.accion_signal.emit(accion)
+
 
     def llamar_servicio_vuelo(self, estado, altura, ancho, largo):
         """Método que será llamado desde la GUI"""
@@ -136,7 +137,7 @@ class RosWorker(QThread):
         self.status_signal.emit(f"Enviando Config: Altura={altura}m, Cajón={ancho}x{largo}m")
         self.client.call_async(req)
 
-    def configurar_vuelo(self, iniciar, altura, velocidad, largo, ancho):
+    def configurar_vuelo(self, iniciar, altura, velocidad, largo, ancho, wp_x, wp_y, wp_z, wp_yaw):
         if not self.config_client_ConfigurarVuelo:
             self.status_signal.emit("Servicio no disponible")
             return False
@@ -150,6 +151,10 @@ class RosWorker(QThread):
         req.velocidad_max = velocidad
         req.largo_cajon = largo
         req.ancho_cajon = ancho
+        req.primer_wp_x = wp_x
+        req.primer_wp_y = wp_y
+        req.primer_wp_z = wp_z
+        req.primer_wp_yaw = wp_yaw
         
         self.status_signal.emit("Enviando config")
 
@@ -316,6 +321,29 @@ class DroneDashboard(QMainWindow):
         layout.addWidget(QLabel("<h2>Ajustes de Misión</h2>"))
 
         layout.addWidget(QLabel("Ajustes de dron"))
+        layout.addWidget(QLabel("<b>Primer waypoint (m):</b>"))
+        self.primer_wp_x = QDoubleSpinBox()
+        self.primer_wp_x.setRange(-100.0, 100.0)
+        self.primer_wp_x.setValue(2.0)
+        layout.addWidget(self.primer_wp_x)
+
+        self.primer_wp_y = QDoubleSpinBox()
+        self.primer_wp_y.setRange(-100.0, 100.0)
+        self.primer_wp_y.setValue(-5.3)
+        layout.addWidget(self.primer_wp_y)
+
+        self.primer_wp_z = QDoubleSpinBox()
+        self.primer_wp_z.setRange(-100.0, 100.0)
+        self.primer_wp_z.setValue(2.0)
+        layout.addWidget(self.primer_wp_z)
+  
+        self.primer_wp_yaw = QDoubleSpinBox()
+        self.primer_wp_yaw.setRange(-100.0, 100.0)
+        self.primer_wp_yaw.setValue(0.0)
+        layout.addWidget(self.primer_wp_yaw)
+
+
+
         layout.addWidget(QLabel("<b>Altura de despegue (m):</b>"))
         self.despegue_altura = QDoubleSpinBox()
         self.despegue_altura.setRange(0.5, 5.0) # Altura segura
@@ -485,7 +513,12 @@ class DroneDashboard(QMainWindow):
         largo = self.cajon_largo.value()
         ancho = self.cajon_ancho.value()
 
-        success = self.ros_worker.configurar_vuelo(True, altura, velocidad, largo, ancho)
+        wp_x = self.primer_wp_x.value()
+        wp_y = self.primer_wp_y.value()
+        wp_z = self.primer_wp_z.value()
+        wp_yaw = self.primer_wp_yaw.value()
+
+        success = self.ros_worker.configurar_vuelo(True, altura, velocidad, largo, ancho, wp_x, wp_y, wp_z, wp_yaw)
 
         if success:
             self.pages.setCurrentIndex(1)

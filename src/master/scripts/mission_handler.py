@@ -44,6 +44,11 @@ class MissionHandler(Node):
         self.parking_largo = 5.0
         self.parking_ancho = 2.6
 
+        self.primer_waypoint_x = 1.0
+        self.primer_waypoint_y = 1.0
+        self.primer_waypoint_z = 1.0
+        self.primer_waypoint_yaw = 1.0
+
         self.srv_configurar = self.create_service(ConfigurarVuelo, 'configurar_vuelo', self.configurar_vuelo_callback)
 
         self.manual = 0

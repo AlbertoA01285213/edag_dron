@@ -1,7 +1,23 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import ExecuteProcess, LogInfo, TimerAction
+from launch.actions import ExecuteProcess, LogInfo, TimerAction, DeclareLaunchArgument, OpaqueFunction
+from launch.substitutions import LaunchConfiguration
 import os
+
+# def launch_setup(context, *args, **kwargs):
+#     num_drones = int(LaunchConfiguration('num_drones').perform(context))
+#     nodes_to_start = []
+
+#     for i in range(num_drones):
+#         drone_id = i + 1
+
+#     return nodes_to_start
+
+# def generate_launch_description():
+#     return LaunchDescription([
+#         DeclareLaunchArgument('num_drones', default_value='1', description='Número de drones'),
+#         OpaqueFunction(function=launch_setup)
+#     ])
 
 def generate_launch_description():
 
@@ -31,6 +47,9 @@ def generate_launch_description():
         )]
     )
 
+    # PX4_SYS_AUTOSTART=4001 PX4_GZ_MODEL_POSE="0,0,0,0,0,0" PX4_SIM_MODEL=gz_x500 ./build/px4_sitl_default/bin/px4
+    # PX4_SYS_AUTOSTART=4001 PX4_GZ_MODEL_POSE="1,0,0,0,0,0" PX4_SIM_MODEL=gz_x500 ./build/px4_sitl_default/bin/px4 -i 1
+
 
     px4_autopilot_dir = os.path.expanduser('~/Documents/edag_dron/src/PX4-Autopilot')
     px4_sitl = ExecuteProcess(
@@ -48,7 +67,7 @@ def generate_launch_description():
 
     mission_handler = TimerAction(period=7.0, actions=[Node(
                 package='master',
-                executable='mission_handler',
+                executable='mission_handler_2',
                 # parameters=[{'use_sim_time': True}],
                 output='screen')])
 
