@@ -19,7 +19,7 @@ def generate_launch_description():
     qground_control = TimerAction(period=2.0,actions=[ExecuteProcess(cmd=[qgc_path])])
 
     gui = TimerAction(period=8.0, actions=[ExecuteProcess(
-        cmd = ['python3', 'main_gui.py'], cwd = gui_dir, additional_env=env, output = 'screen')])
+        cmd = ['python3', 'ma_main_gui.py'], cwd = gui_dir, additional_env=env, output = 'screen')])
 
    
     drone_elements = []

@@ -13,16 +13,40 @@ find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 
-find_package(ignition-gazebo6 REQUIRED)
-find_package(ignition-plugin1 REQUIRED)
-find_package(ignition-transport11 REQUIRED)
+# find_package(ignition-gazebo6 REQUIRED)
+# find_package(ignition-plugin1 REQUIRED)
+# find_package(ignition-transport11 REQUIRED)
+
+# find_package(gz-sim7 REQUIRED) 
+# find_package(gz-plugin2 REQUIRED)
+# find_package(gz-transport12 REQUIRED)
+
+find_package(gz-sim8 REQUIRED)
+find_package(gz-plugin2 REQUIRED)
+find_package(gz-transport13 REQUIRED)
+find_package(gz-msgs10 REQUIRED)
+
+# include_directories(
+#   include
+#   ${Eigen3_INCLUDE_DIRS}
+#   ${ignition-gazebo6_INCLUDE_DIRS}
+#   ${ignition-plugin1_INCLUDE_DIRS}
+#   ${ignition-transport11_INCLUDE_DIRS}
+# )
+
+# include_directories(
+#   include
+#   ${Eigen3_INCLUDE_DIRS}
+#   ${gz-sim7_INCLUDE_DIRS}
+#   ${gz-plugin2_INCLUDE_DIRS}
+#   ${gz-transport12_INCLUDE_DIRS}
+# )
 
 include_directories(
   include
-  ${Eigen3_INCLUDE_DIRS}
-  ${ignition-gazebo6_INCLUDE_DIRS}
-  ${ignition-plugin1_INCLUDE_DIRS}
-  ${ignition-transport11_INCLUDE_DIRS}
+  ${gz-sim8_INCLUDE_DIRS}
+  ${gz-plugin2_INCLUDE_DIRS}
+  ${gz-transport13_INCLUDE_DIRS}
 )
 
 add_library(SubmarineDynamics SHARED
@@ -30,10 +54,24 @@ add_library(SubmarineDynamics SHARED
   src/uuv_dynamic_model.cpp
 )
 
+# target_link_libraries(SubmarineDynamics
+#   ${ignition-gazebo6_LIBRARIES}
+#   ignition-plugin1::all
+#   ignition-transport11::core
+#   Eigen3::Eigen
+# )
+
+# target_link_libraries(SubmarineDynamics
+#   gz-sim7::core
+#   gz-plugin2::all
+#   gz-transport12::core
+#   Eigen3::Eigen
+# )
+
 target_link_libraries(SubmarineDynamics
-  ${ignition-gazebo6_LIBRARIES}
-  ignition-plugin1::all
-  ignition-transport11::core
+  gz-sim8::core
+  gz-plugin2::all
+  gz-transport13::core
   Eigen3::Eigen
 )
 

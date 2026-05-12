@@ -1,8 +1,8 @@
-#include <ignition/gazebo/System.hh>
-#include <ignition/gazebo/Model.hh>
-#include <ignition/gazebo/components/Pose.hh>
-#include <ignition/gazebo/components/Name.hh>
-#include <ignition/plugin/Register.hh>
+// #include <ignition/gazebo/System.hh>
+// #include <ignition/gazebo/Model.hh>
+// #include <ignition/gazebo/components/Pose.hh>
+// #include <ignition/gazebo/components/Name.hh>
+// #include <ignition/plugin/Register.hh>
 
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
@@ -11,8 +11,19 @@
 
 #include "uuv_dynamic_model.h"
 
-using namespace ignition;
-using namespace gazebo;
+// #include <gz/plugin/Register.hh>
+
+#include <gz/sim/System.hh>
+#include <gz/sim/Model.hh>
+#include <gz/sim/components/Pose.hh>
+#include <gz/plugin/Register.hh>
+
+// using namespace ignition;
+// using namespace gazebo;
+// using namespace systems;
+
+using namespace gz;
+using namespace sim;
 using namespace systems;
 
 class SubmarineDynamics : public System, 
@@ -127,7 +138,14 @@ private:
     std::array<double, 6> thruster_input_;
 };
 
-IGNITION_ADD_PLUGIN(SubmarineDynamics,
-                    ignition::gazebo::System,
-                    SubmarineDynamics::ISystemConfigure,
-                    SubmarineDynamics::ISystemPreUpdate)
+// IGNITION_ADD_PLUGIN(SubmarineDynamics,
+//                     ignition::gazebo::System,
+//                     SubmarineDynamics::ISystemConfigure,
+//                     SubmarineDynamics::ISystemPreUpdate)
+
+GZ_ADD_PLUGIN(SubmarineDynamics,
+              gz::sim::System,
+              SubmarineDynamics::ISystemConfigure,
+              SubmarineDynamics::ISystemPreUpdate)
+
+GZ_ADD_PLUGIN_ALIAS(SubmarineDynamics, "uuv_gazebo_plugins::SubmarineDynamics")

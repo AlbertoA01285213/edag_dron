@@ -192,3 +192,7 @@ Aqui pueden poner notas y observaciones para que todos estemos al tanto de lo qu
 COM_DISARM_PRFLT
 param set MPC_XY_VEL_MAX 1.5
 param set MC_YAWRATE_MAX 70
+
+PX4_SYS_AUTOSTART=4001 PX4_SIM_MODEL=gz_x500 ./build/px4_sitl_default/bin/px4 -i 1
+
+PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART=4001 PX4_GZ_MODEL_POSE="0,1" PX4_SIM_MODEL=gz_x500 ./build/px4_sitl_default/bin/px4 -i 2

@@ -8,7 +8,7 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image, NavSatFix  # o el tipo que uses para odometría
 from PySide6.QtGui import QPixmap, QImage, QPainter, QColor, QPen, QCursor
 from PySide6.QtCore import Signal, QThread, Qt, Slot, QPoint
-from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QToolTip, QComboBox, 
+from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QToolTip,
                              QVBoxLayout, QHBoxLayout, QWidget, QStackedWidget, QMessageBox,
                              QLabel, QFrame, QGridLayout, QSpinBox, QDoubleSpinBox, QWidget)
 import rclpy
@@ -44,21 +44,38 @@ class RosWorker(QThread):
         self.config_client_ConfigurarVuelo = None
         self.config_client_CondicionesVuelo = None
 
-        self.namespace = "px4_1"
-
-        self.subs = []
-        self.clients = {}
-
     def run(self):
         # Inicializar ROS 2 en este hilo
         rclpy.init(args=None)
         self.node = rclpy.create_node('dashboard_node')
 
-        # PRIMERO configurar el namespace por defecto
-        self.namespace = "px4_1"
+        # qos_profile = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=1)
         
-        # LUEGO crear suscriptores y clientes con namespace
-        self.setup_drone_comms()
+        if ConfigurarVuelo:
+            self.config_client_ConfigurarVuelo = self.node.create_client(
+                ConfigurarVuelo,
+                'configurar_vuelo'
+            )
+            self.status_signal.emit("Cliente de configuracion creado")
+        else:
+            self.status_signal.emit("Servicio personalizado no disponible")
+
+        if CondicionesVuelo:
+            self.config_client_CondicionesVuelo = self.node.create_client(
+                CondicionesVuelo,
+                'condiciones_vuelo'
+            )
+            self.status_signal.emit("Cliente de configuracion creado")
+        else:
+            self.status_signal.emit("Servicio personalizado no disponible")
+
+
+        # self.client = self.node.create_client(SetBool, 'iniciar_mision')
+
+        self.node.create_subscription(Image, 'low_res_feed', self.camera_callback, 10)
+        self.node.create_subscription(Pose, 'pose_dron', self.odom_callback, 10)
+        self.node.create_subscription(String, 'accion_odom', self.accion_callback, 10)
+        self.node.create_subscription(Pose, 'waypoint_odom', self.wp_callback, 10)
         
         self.status_signal.emit("Nodo ROS iniciado. Esperando datos...")
         
@@ -69,48 +86,6 @@ class RosWorker(QThread):
         finally:
             self.node.destroy_node()
             rclpy.shutdown()
-
-    def setup_drone_comms(self):
-        # 1. Destruir suscriptores anteriores si existen
-        for s in self.subs:
-            self.node.destroy_subscription(s)
-        self.subs = []
-        
-        # 2. Destruir clientes anteriores si existen
-        if self.config_client_ConfigurarVuelo:
-            self.node.destroy_client(self.config_client_ConfigurarVuelo)
-            self.config_client_ConfigurarVuelo = None
-        
-        if self.config_client_CondicionesVuelo:
-            self.node.destroy_client(self.config_client_CondicionesVuelo)
-            self.config_client_CondicionesVuelo = None
-        
-        # 3. Definir el prefijo del namespace
-        ns = self.namespace
-        self.status_signal.emit(f"Cambiando a {ns}...")
-
-        # 4. Re-crear Suscriptores
-        self.subs.append(self.node.create_subscription(Image, f'/{ns}/low_res_feed', self.camera_callback, 10))
-        self.subs.append(self.node.create_subscription(Pose, f'/{ns}/pose_dron', self.odom_callback, 10))
-        self.subs.append(self.node.create_subscription(String, f'/{ns}/accion_odom', self.accion_callback, 10))
-        self.subs.append(self.node.create_subscription(Pose, f'/{ns}/waypoint_odom', self.wp_callback, 10))
-
-        # 5. Re-crear Clientes de Servicio
-        if ConfigurarVuelo:
-            service_name = f'/{ns}/configurar_vuelo'
-            self.config_client_ConfigurarVuelo = self.node.create_client(ConfigurarVuelo, service_name)
-            self.status_signal.emit(f"Cliente ConfigurarVuelo creado en: {service_name}")
-        
-        if CondicionesVuelo:
-            service_name = f'/{ns}/condiciones_vuelo'
-            self.config_client_CondicionesVuelo = self.node.create_client(CondicionesVuelo, service_name)
-            self.status_signal.emit(f"Cliente CondicionesVuelo creado en: {service_name}")
-    
-    def cambiar_dron(self, nombre_dron):
-        """Método para ser llamado desde la GUI"""
-        self.namespace = nombre_dron
-        if self.node:
-            self.setup_drone_comms()
 
     def camera_callback(self, msg):
         try:
@@ -149,18 +124,18 @@ class RosWorker(QThread):
         self.accion_signal.emit(accion)
 
 
-    # def llamar_servicio_vuelo(self, estado, altura, ancho, largo):
-    #     """Método que será llamado desde la GUI"""
-    #     if not self.client.wait_for_service(timeout_sec=1.0):
-    #         self.status_signal.emit("Servicio no disponible")
-    #         return
+    def llamar_servicio_vuelo(self, estado, altura, ancho, largo):
+        """Método que será llamado desde la GUI"""
+        if not self.client.wait_for_service(timeout_sec=1.0):
+            self.status_signal.emit("Servicio no disponible")
+            return
 
-    #     req = SetBool.Request()
-    #     req.data = estado
-    #     # Aquí podrías usar un servicio personalizado que acepte altura, ancho, etc.
-    #     # Por ahora enviamos el log de lo que se mandaría
-    #     self.status_signal.emit(f"Enviando Config: Altura={altura}m, Cajón={ancho}x{largo}m")
-    #     self.client.call_async(req)
+        req = SetBool.Request()
+        req.data = estado
+        # Aquí podrías usar un servicio personalizado que acepte altura, ancho, etc.
+        # Por ahora enviamos el log de lo que se mandaría
+        self.status_signal.emit(f"Enviando Config: Altura={altura}m, Cajón={ancho}x{largo}m")
+        self.client.call_async(req)
 
     def configurar_vuelo(self, iniciar, altura, velocidad, largo, ancho, wp_x, wp_y, wp_z, wp_yaw):
         if not self.config_client_ConfigurarVuelo:
@@ -318,12 +293,6 @@ class DroneDashboard(QMainWindow):
 
         # 1. Barra Lateral (Menu)
         self.sidebar = QVBoxLayout()
-        self.sidebar.addWidget(QLabel("<b>Seleccionar Dron:</b>"))
-        self.combo_drones = QComboBox()
-        self.combo_drones.addItems(["px4_1", "px4_2"])
-        self.combo_drones.currentIndexChanged.connect(self.on_drone_changed)
-        self.sidebar.addWidget(self.combo_drones)
-        self.sidebar.addSpacing(20)
         self.btn_config = QPushButton("⚙️ Configuración")
         self.btn_vuelo = QPushButton("🚀 Vuelo")
         self.btn_results = QPushButton("📊 Resultados")
@@ -414,7 +383,7 @@ class DroneDashboard(QMainWindow):
         f_layout = QVBoxLayout()
     
         self.camera_label = QLabel()
-        self.camera_label.setMaximumSize(640, 360)
+        self.camera_label.setMinimumSize(640, 360)
         self.camera_label.setStyleSheet("border: 2px solid gray;")
         self.camera_label.setAlignment(Qt.AlignCenter)
         f_layout.addWidget(self.camera_label)
@@ -473,17 +442,6 @@ class DroneDashboard(QMainWindow):
         res_layout.addWidget(self.parking_map)
         self.page_res.setLayout(res_layout)
         self.pages.addWidget(self.page_res)
-
-    def on_drone_changed(self):
-        nuevo_dron = self.combo_drones.currentText()
-        # Llamamos al worker para que cambie los tópicos
-        self.ros_worker.cambiar_dron(nuevo_dron)
-        
-        # Opcional: Limpiar la pantalla para el nuevo dron
-        if self.camera_label:
-            self.camera_label.clear()
-            self.camera_label.setText(f"Cambiando a {nuevo_dron}...")
-        self.status_label.setText(f"● Conectando a {nuevo_dron}")
 
     def update_camera_feed(self, pixmap):
         """Actualiza la imagen de la cámara."""

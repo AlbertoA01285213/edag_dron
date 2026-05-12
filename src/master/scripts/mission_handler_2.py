@@ -29,6 +29,10 @@ class MissionHandler(Node):
 
         self.get_logger().info(f"Cargando misión desde: {mission_path}")
 
+        self.declare_parameter('sys_id', 1)
+        self.sys_id = self.get_parameter('sys_id').value
+        self.get_logger().info(f"Iniciando MissionHandler para Sistema ID: {self.sys_id}")
+
         # 3. Validar si el archivo existe antes de abrirlo
         if not os.path.exists(mission_path):
             self.get_logger().error(f"¡ARCHIVO DE MISIÓN NO ENCONTRADO!: {mission_path}")
@@ -57,17 +61,6 @@ class MissionHandler(Node):
 
         self.srv_condiciones = self.create_service(CondicionesVuelo, 'condiciones_vuelo', self.condiciones_vuelo_callback)
         
-        self.libreria_de_rutinas = {
-            1: [ # ID 1: Barrido Derecha
-                {"type": "scan_2", "offset": 1.0, "cajones": 6, "width": 2.5, "side": 1},
-                {"type": "land"}
-            ],
-            2: [ # ID 2: Barrido Izquierda
-                {"type": "scan_2", "offset": 1.0, "cajones": 6, "width": 2.5, "side": -1},
-                {"type": "land"}
-            ]
-        }
-
         self.actions = []
         self.fase_busqueda = True
         self.despegue_exitoso = False
@@ -98,14 +91,14 @@ class MissionHandler(Node):
 
         self.current_aruco_error = None
 
-        self.create_subscription(VehicleOdometry, '/fmu/out/vehicle_odometry', self.pose_callback, qos_profile)
-        self.create_subscription(VehicleCommandAck, '/fmu/out/vehicle_command_ack', self.ack_callback, qos_profile)
+        self.create_subscription(VehicleOdometry, 'fmu/out/vehicle_odometry', self.pose_callback, qos_profile)
+        self.create_subscription(VehicleCommandAck, 'fmu/out/vehicle_command_ack', self.ack_callback, qos_profile)
         self.create_subscription(Pose, 'aruco_error', self.aruco_error_callback, 10)
         self.create_subscription(Int16, 'aruco_id', self.aruco_id_callback, 10)
 
-        self.trajectory_pub = self.create_publisher(TrajectorySetpoint, '/fmu/in/trajectory_setpoint', 10)
-        self.command_publisher = self.create_publisher(VehicleCommand, '/fmu/in/vehicle_command', 10)
-        self.offboard_publisher = self.create_publisher(OffboardControlMode, '/fmu/in/offboard_control_mode', 10)
+        self.trajectory_pub = self.create_publisher(TrajectorySetpoint, 'fmu/in/trajectory_setpoint', 10)
+        self.command_publisher = self.create_publisher(VehicleCommand, 'fmu/in/vehicle_command', 10)
+        self.offboard_publisher = self.create_publisher(OffboardControlMode, 'fmu/in/offboard_control_mode', 10)
 
         self.waypoint_odom_pub = self.create_publisher(Pose, 'waypoint_odom', 10)
 
@@ -146,17 +139,18 @@ class MissionHandler(Node):
     def configurar_vuelo_callback(self, request, response):
         """Callback del servicio de configuración"""
         self.mision_iniciada = request.iniciar
-        self.altura_vuelo = -abs(request.altura_vuelo)  # Negativo para NED
+        self.altura_vuelo = abs(request.altura_vuelo)  # Negativo para NED
         self.velocidad_max = request.velocidad_max
         self.parking_largo = request.largo_cajon
         self.parking_ancho = request.ancho_cajon
 
         if self.mision_iniciada:
+            # self.get_logger().info(f"Estado: {self.mision_iniciada}")
             self.get_logger().info(f"""
             🚀 MISIÓN CONFIGURADA:
             - Altura: {abs(self.altura_vuelo)}m
             - Velocidad máxima: {self.velocidad_max}m/s
-            - Área de estacionamiento: {self.parking_largo}x{self.parking_ancho}m
+            - Área de estacionamiento: {self.parking_largo} x {self.parking_ancho}m
             """)
             response.success = True
             response.message = "Misión configurada correctamente"
@@ -225,9 +219,9 @@ class MissionHandler(Node):
         msg = VehicleCommand()
         msg.command = VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM
         msg.param1 = 1.0  # 1 = Arm
-        msg.target_system = 1
+        msg.target_system = self.sys_id
         msg.target_component = 1
-        msg.source_system = 1
+        msg.source_system = self.sys_id
         msg.source_component = 1
         msg.from_external = True
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
@@ -645,7 +639,6 @@ class MissionHandler(Node):
                         offset = 1.10
                         cajones = 6
                         width = 2.6
-                        side = 1
 
                         if self.barrido_sub_idx == 0:
                             if not hasattr(self, 'scan_iniciado'):
@@ -658,20 +651,20 @@ class MissionHandler(Node):
                             
                                 self.theta = self.pose_actual[3]
 
+
+                                fwd = 0
+                                rgt = -1 * (cajones * width + offset)
+                                dwn = 0
+                                
+                                self.tx, self.ty, self.tz, self.tyaw = self.get_global_coordinates(fwd, rgt, dwn)
+
+                                yaw_obj = self.scan_origin_yaw
+
+                                self.send_setpoint(self.tx, self.ty, self.tz, yaw_obj)
+
                                 self.get_logger().info(f"🚀 Iniciando barrido para {cajones} cajones.")
                                 return 
                             
-                            y_obj = self.scan_origin_y + cajones * width - offset
-
-                            x_obj = self.scan_origin_x
-                            z_obj = self.scan_origin_z
-                            yaw_obj = self.scan_origin_yaw
-
-                            setpoint_msg = TrajectorySetpoint()
-                            setpoint_msg.position = [float(x_obj), float(y_obj), float(z_obj)]
-                            setpoint_msg.yaw = yaw_obj
-                            setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-                            self.trajectory_pub.publish(setpoint_msg)
 
                             distancia_recorrida = abs(self.pose_actual[1] - self.scan_origin_y)
                             punto_proxima_foto = offset + (self.current_cajon * width)
@@ -681,14 +674,12 @@ class MissionHandler(Node):
 
                                 self.tomar_foto_pub.publish(Int16(data=1))
                                 self.tomar_foto_pub.publish(Int16(data=0))
-                                # Nota: El nodo de la cámara debería apagar el flag solo tras guardar
-                                
-                                self.current_cajon += 1
 
+                                self.current_cajon += 1
                             
-                            dx = x_obj - self.pose_actual[0]
-                            dy = y_obj - self.pose_actual[1]
-                            dz = z_obj - self.pose_actual[2]
+                            dx = self.tx - self.pose_actual[0]
+                            dy = self.ty - self.pose_actual[1]
+                            dz = self.tz - self.pose_actual[2]
                                 
                             distancia = np.sqrt(dx**2 + dy**2 + dz**2)
 
@@ -719,12 +710,7 @@ class MissionHandler(Node):
                             dz = float(self.scan_origin_z - self.pose_actual[2])
                             distancia = np.sqrt(dx**2 + dy**2 + dz**2)
 
-                            setpoint_msg = TrajectorySetpoint()
-                            setpoint_msg.position = [self.scan_origin_x, self.scan_origin_y, self.scan_origin_z]
-                            setpoint_msg.yaw = self.scan_origin_yaw
-                            setpoint_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-            
-                            self.trajectory_pub.publish(setpoint_msg)
+                            self.send_setpoint(self.scan_origin_x, self.scan_origin_y, self.scan_origin_z, self.scan_origin_yaw)
 
                             if distancia < 0.3:
                                 self.get_logger().info("Barrido completado")
@@ -737,14 +723,16 @@ class MissionHandler(Node):
                                 del self.aruco_id
                                 return
                             
+
                     elif self.aruco_id == 3:
                         ''' Cambio de fila girando 180 '''
                         offset = 2.0
                         length = 13.0
+                        height_offset = 2.0
                         
-                        if not hasattr(self, 'change_line_iniciado'):
-                            self.get_logger().info(f"Iniciando cambio de linea con variante giros")
-                            self.change_line_iniciado = True
+                        if not hasattr(self, 'cambio_linea_1'):
+                            self.get_logger().info(f"Iniciando cambio de linea con salto y giro")
+                            self.cambio_linea_1 = True
                             self.sub_step = 1
                             
                             self.start_x = self.pose_actual[0]
@@ -753,54 +741,41 @@ class MissionHandler(Node):
                             self.start_yaw = self.pose_actual[3]                
                             return
                         
-                        target_x, target_y, target_z, target_yaw = 0.0, 0.0, 0.0, 0.0 
+                        # target_x, target_y, target_z, target_yaw = 0.0, 0.0, 0.0, 0.0 
          
                         if self.sub_step == 1:
                             target_x = self.start_x
                             target_y = self.start_y
-                            target_z = self.start_z - 2.0
-                            target_yaw = self.start_yaw
-                            label = "Subiendo por seguridad"
-
-                        elif self.sub_step == 2:
-                            target_x = self.start_x + length + offset
-                            target_y = self.start_y
-                            target_z = self.start_z - 2.0
-                            target_yaw = self.start_yaw
-                            label = "Moviéndose a la siguiente fila"
-
-                        elif self.sub_step == 3:
-                            target_x = self.start_x + length + offset
-                            target_y = self.start_y
                             target_z = self.start_z
                             target_yaw = self.start_yaw + 3.14
-                            label = "Bajando y rotando a nueva fila"
 
-                        self.send_setpoint(target_x, target_y, target_z, target_yaw)
+                        elif self.sub_step == 2:
+                            if not hasattr(self, "hold_start"):
+                                self.get_logger().info("Iniciando hold")
+                                self.hold_start = time.perf_counter()
 
-                        dx = target_x - self.pose_actual[0]
-                        dy = target_y - self.pose_actual[1]
-                        dz = target_z - self.pose_actual[2]
-                        distancia = np.sqrt(dx**2 + dy**2 + dz**2)
+                            if time.perf_counter() - self.hold_start >= 4.0:
+                                self.get_logger().info("Hold terminado")
+                                del self.hold_start
 
-                        if distancia < 0.3:
-                            self.get_logger().info(f"✅ Paso {self.sub_step} completado")
-                            self.sub_step += 1
-                            
-                            # Si terminamos los 3 pasos, cerramos la acción
-                            if self.sub_step > 3:
-                                if not hasattr(self, "hold_start"):
-                                    self.hold_start = time.perf_counter()
+                                self.get_logger().info("Cambio de fila con rotacion terminado")
+                                self.search_aruco = True
+                                del self.aruco_id
+                                del self.cambio_linea_1
+                                del self.sub_step
+                                return
 
-                                if time.perf_counter() - self.hold_start >= 2:
-                                    del self.hold_start
-                                    self.get_logger().info("Cambio de fila con rotacion terminado")
-                                    self.search_aruco = True
-                                    del self.aruco_id
+                        if self.sub_step <= 1:
+                            self.send_setpoint(target_x, target_y, target_z, target_yaw)
 
-                                    del self.change_line_iniciado
-                                    del self.sub_step
-                                    return
+                            dx = target_x - self.pose_actual[0]
+                            dy = target_y - self.pose_actual[1]
+                            dz = target_z - self.pose_actual[2]
+                            distancia = np.sqrt(dx**2 + dy**2 + dz**2)
+
+                            if distancia < 0.3:
+                                self.get_logger().info(f"✅ Paso {self.sub_step} completado")
+                                self.sub_step += 1
 
                     elif self.aruco_id == 4:
                         ''' Cambio de fila avance '''
